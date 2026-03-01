@@ -35,7 +35,8 @@ object ContainerSystemdManager {
         ENABLED_RUNNING,
         ENABLED_STOPPED,
         DISABLED_STOPPED,
-        DISABLED_RUNNING,
+        STATIC,
+        ABNORMAL,
         MASKED
     }
 
@@ -45,14 +46,16 @@ object ContainerSystemdManager {
         val status: ServiceStatus,
         val isEnabled: Boolean,
         val isRunning: Boolean,
-        val isMasked: Boolean
+        val isMasked: Boolean,
+        val isStatic: Boolean
     )
 
     enum class ServiceFilter {
         RUNNING,    // Enabled + Running (healthy running)
         ENABLED,    // Enabled but NOT running
         DISABLED,   // Disabled and NOT running
-        ABNORMAL,   // Disabled but running (unhealthy state)
+        ABNORMAL,   // Running but not enabled, static, or masked
+        STATIC,     // Explicitly static services
         MASKED,
         ALL
     }
@@ -168,11 +171,13 @@ object ContainerSystemdManager {
             val enabledDeferred = async { runScript(containerName, "--enabled") }
             val disabledDeferred = async { runScript(containerName, "--disabled") }
             val maskedDeferred = async { runScript(containerName, "--masked") }
+            val staticDeferred = async { runScript(containerName, "--static") }
 
             val (runningSuccess, runningLines) = runningDeferred.await()
             val (enabledSuccess, enabledLines) = enabledDeferred.await()
             val (disabledSuccess, disabledLines) = disabledDeferred.await()
             val (maskedSuccess, maskedLines) = maskedDeferred.await()
+            val (staticSuccess, staticLines) = staticDeferred.await()
 
             // Parse running services (NAME|DESCRIPTION)
             val runningServices = mutableMapOf<String, String>()
@@ -189,6 +194,7 @@ object ContainerSystemdManager {
             val enabledSet = if (enabledSuccess) enabledLines.map { it.trim() }.filter { it.isNotBlank() }.toSet() else emptySet()
             val disabledSet = if (disabledSuccess) disabledLines.map { it.trim() }.filter { it.isNotBlank() }.toSet() else emptySet()
             val maskedSet = if (maskedSuccess) maskedLines.map { it.trim() }.filter { it.isNotBlank() }.toSet() else emptySet()
+            val staticSet = if (staticSuccess) staticLines.map { it.trim() }.filter { it.isNotBlank() }.toSet() else emptySet()
 
             // Build unified list
             val allServices = mutableMapOf<String, ServiceInfo>()
@@ -202,7 +208,22 @@ object ContainerSystemdManager {
                     status = if (isRunning) ServiceStatus.ENABLED_RUNNING else ServiceStatus.ENABLED_STOPPED,
                     isEnabled = true,
                     isRunning = isRunning,
-                    isMasked = false
+                    isMasked = false,
+                    isStatic = false
+                )
+            }
+
+            // Static services
+            staticSet.forEach { name ->
+                val isRunning = runningServices.containsKey(name)
+                allServices[name] = ServiceInfo(
+                    name = name,
+                    description = runningServices[name] ?: "",
+                    status = ServiceStatus.STATIC,
+                    isEnabled = false,
+                    isRunning = isRunning,
+                    isMasked = false,
+                    isStatic = true
                 )
             }
 
@@ -212,10 +233,11 @@ object ContainerSystemdManager {
                 allServices[name] = ServiceInfo(
                     name = name,
                     description = runningServices[name] ?: "",
-                    status = if (isRunning) ServiceStatus.DISABLED_RUNNING else ServiceStatus.DISABLED_STOPPED,
+                    status = if (isRunning) ServiceStatus.ABNORMAL else ServiceStatus.DISABLED_STOPPED,
                     isEnabled = false,
                     isRunning = isRunning,
-                    isMasked = false
+                    isMasked = false,
+                    isStatic = false
                 )
             }
 
@@ -227,20 +249,22 @@ object ContainerSystemdManager {
                     status = ServiceStatus.MASKED,
                     isEnabled = false,
                     isRunning = false,
-                    isMasked = true
+                    isMasked = true,
+                    isStatic = false
                 )
             }
 
-            // Running services not categorized
+            // Remaining running services (categorized as Abnormal if not missed above)
             runningServices.forEach { (name, desc) ->
                 if (!allServices.containsKey(name)) {
                     allServices[name] = ServiceInfo(
                         name = name,
                         description = desc,
-                        status = ServiceStatus.DISABLED_RUNNING,
+                        status = ServiceStatus.ABNORMAL,
                         isEnabled = false,
                         isRunning = true,
-                        isMasked = false
+                        isMasked = false,
+                        isStatic = false
                     )
                 }
             }
@@ -259,9 +283,10 @@ object ContainerSystemdManager {
         return when (filter) {
             ServiceFilter.ALL -> services
             ServiceFilter.RUNNING -> services.filter { it.isRunning && it.isEnabled && !it.isMasked }  // Healthy running
+            ServiceFilter.STATIC -> services.filter { it.isStatic }
+            ServiceFilter.ABNORMAL -> services.filter { it.isRunning && !it.isEnabled && !it.isStatic && !it.isMasked } // Running but not enabled/static
             ServiceFilter.ENABLED -> services.filter { it.isEnabled && !it.isRunning && !it.isMasked } // Enabled but stopped
-            ServiceFilter.DISABLED -> services.filter { !it.isEnabled && !it.isRunning && !it.isMasked } // Disabled and stopped
-            ServiceFilter.ABNORMAL -> services.filter { it.isRunning && !it.isEnabled && !it.isMasked } // Running but disabled (unhealthy)
+            ServiceFilter.DISABLED -> services.filter { !it.isEnabled && !it.isRunning && !it.isMasked && !it.isStatic } // Disabled and stopped
             ServiceFilter.MASKED -> services.filter { it.isMasked }
         }
     }

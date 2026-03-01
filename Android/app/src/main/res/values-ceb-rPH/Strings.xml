@@ -203,11 +203,13 @@
     <string name="running_legend">Nagdagan</string>
     <string name="enabled_legend">Naka-enable</string>
     <string name="disabled_legend">Naka-disable</string>
+    <string name="static_legend">Static</string>
     <string name="abnormal_legend">Abnormal</string>
     <string name="masked_legend">Naka-mask</string>
     <string name="all_legend">Tanan</string>
     <string name="running_status">Nagdagan</string>
     <string name="enabled_status">Naka-enable</string>
+    <string name="static_status">Static</string>
     <string name="abnormal_status">Abnormal</string>
     <string name="disabled_status">Naka-disable</string>
     <string name="masked_status">Naka-mask</string>
@@ -228,6 +230,7 @@
     <string name="no_running_services">Walay serbisyo nga nagdagan</string>
     <string name="no_enabled_services">Walay serbisyo nga naka-enable</string>
     <string name="no_disabled_services">Walay serbisyo nga naka-disable</string>
+    <string name="no_static_services">Walay serbisyo nga abnormal</string>
     <string name="no_abnormal_services">Walay serbisyo nga abnormal</string>
     <string name="no_masked_services">Walay serbisyo nga naka-mask</string>
 

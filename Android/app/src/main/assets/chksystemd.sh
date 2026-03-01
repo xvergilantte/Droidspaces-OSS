@@ -16,6 +16,9 @@ systemctl list-unit-files --type=service --state=disabled --no-legend --no-pager
 --masked)
 systemctl list-unit-files --type=service --state=masked --no-legend --no-pager 2>/dev/null | awk '{print $1}' | sed 's/\.service$//'
 ;;
+--static)
+systemctl list-unit-files --type=service --state=static --no-legend --no-pager 2>/dev/null | awk '{print $1}' | sed 's/\.service$//'
+;;
 --all)
 systemctl list-unit-files --type=service --no-legend --no-pager 2>/dev/null | while read -r line; do
 name=$(echo "$line" | awk '{print $1}' | sed 's/\.service$//')
@@ -24,4 +27,3 @@ echo "${name}|${state}"
 done
 ;;
 esac
-

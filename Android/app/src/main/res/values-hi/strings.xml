@@ -218,11 +218,13 @@
     <string name="running_legend">चल रही</string>
     <string name="enabled_legend">सक्रिय</string>
     <string name="disabled_legend">निष्क्रिय</string>
+    <string name="static_legend">असामान्य</string>
     <string name="abnormal_legend">असामान्य</string>
     <string name="masked_legend">मास्क की गई</string>
     <string name="all_legend">सभी</string>
     <string name="running_status">चल रही</string>
     <string name="enabled_status">सक्रिय</string>
+    <string name="static_status">असामान्य</string>
     <string name="abnormal_status">असामान्य</string>
     <string name="disabled_status">निष्क्रिय</string>
     <string name="masked_status">मास्क की गई</string>
@@ -243,6 +245,7 @@
     <string name="no_running_services">कोई चल रही सेवाएँ नहीं</string>
     <string name="no_enabled_services">कोई सक्रिय सेवाएँ नहीं</string>
     <string name="no_disabled_services">कोई निष्क्रिय सेवाएँ नहीं</string>
+    <string name="no_static_services">कोई असामान्य सेवाएँ नहीं</string>
     <string name="no_abnormal_services">कोई असामान्य सेवाएँ नहीं</string>
     <string name="no_masked_services">कोई मास्क की गई सेवाएँ नहीं</string>
 

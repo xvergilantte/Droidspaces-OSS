@@ -218,11 +218,13 @@
     <string name="running_legend">Запущено</string>
     <string name="enabled_legend">Включено</string>
     <string name="disabled_legend">Отключено</string>
+    <string name="static_legend">Аномальное</string>
     <string name="abnormal_legend">Аномальное</string>
     <string name="masked_legend">Замаскировано</string>
     <string name="all_legend">Все</string>
     <string name="running_status">Запущено</string>
     <string name="enabled_status">Включено</string>
+    <string name="static_status">Аномальное</string>
     <string name="abnormal_status">Аномальное</string>
     <string name="disabled_status">Отключено</string>
     <string name="masked_status">Замаскировано</string>
@@ -243,6 +245,7 @@
     <string name="no_running_services">Нет запущенных служб</string>
     <string name="no_enabled_services">Нет включённых служб</string>
     <string name="no_disabled_services">Нет отключённых служб</string>
+    <string name="no_static_services">Нет служб с аномальным состоянием</string>
     <string name="no_abnormal_services">Нет служб с аномальным состоянием</string>
     <string name="no_masked_services">Нет замаскированных служб</string>
 

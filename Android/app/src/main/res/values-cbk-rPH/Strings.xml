@@ -203,11 +203,13 @@
     <string name="running_legend">Ta anda</string>
     <string name="enabled_legend">Habilitao</string>
     <string name="disabled_legend">Deshabilitao</string>
+    <string name="static_legend">Static</string>
     <string name="abnormal_legend">Abnormal</string>
     <string name="masked_legend">Masked</string>
     <string name="all_legend">Todo</string>
     <string name="running_status">Ta anda</string>
     <string name="enabled_status">Habilitao</string>
+    <string name="static_status">Static</string>
     <string name="abnormal_status">Abnormal</string>
     <string name="disabled_status">Deshabilitao</string>
     <string name="masked_status">Masked</string>
@@ -228,6 +230,7 @@
     <string name="no_running_services">No hay maga servicio ta anda</string>
     <string name="no_enabled_services">No hay maga servicio habilitao</string>
     <string name="no_disabled_services">No hay maga servicio deshabilitao</string>
+    <string name="no_static_services">No hay maga servicio abnormal</string>
     <string name="no_abnormal_services">No hay maga servicio abnormal</string>
     <string name="no_masked_services">No hay maga servicio masked</string>
 

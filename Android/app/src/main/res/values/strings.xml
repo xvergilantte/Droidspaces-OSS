@@ -247,11 +247,13 @@
     <string name="running_legend">Running</string>
     <string name="enabled_legend">Enabled</string>
     <string name="disabled_legend">Disabled</string>
+    <string name="static_legend">Static</string>
     <string name="abnormal_legend">Abnormal</string>
     <string name="masked_legend">Masked</string>
     <string name="all_legend">All</string>
     <string name="running_status">Running</string>
     <string name="enabled_status">Enabled</string>
+    <string name="static_status">Static</string>
     <string name="abnormal_status">Abnormal</string>
     <string name="disabled_status">Disabled</string>
     <string name="masked_status">Masked</string>
@@ -272,6 +274,7 @@
     <string name="no_running_services">No running services</string>
     <string name="no_enabled_services">No enabled services</string>
     <string name="no_disabled_services">No disabled services</string>
+    <string name="no_static_services">No static services</string>
     <string name="no_abnormal_services">No abnormal services</string>
     <string name="no_masked_services">No masked services</string>
 

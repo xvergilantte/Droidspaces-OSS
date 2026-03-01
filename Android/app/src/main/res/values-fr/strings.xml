@@ -218,11 +218,13 @@
     <string name="running_legend">En marche</string>
     <string name="enabled_legend">Activé</string>
     <string name="disabled_legend">Désactivé</string>
+    <string name="static_legend">Anormal</string>
     <string name="abnormal_legend">Anormal</string>
     <string name="masked_legend">Masqué</string>
     <string name="all_legend">Tous</string>
     <string name="running_status">En marche</string>
     <string name="enabled_status">Activé</string>
+    <string name="static_status">Anormal</string>
     <string name="abnormal_status">Anormal</string>
     <string name="disabled_status">Désactivé</string>
     <string name="masked_status">Masqué</string>
@@ -243,6 +245,7 @@
     <string name="no_running_services">Aucun service en cours</string>
     <string name="no_enabled_services">Aucun service activé</string>
     <string name="no_disabled_services">Aucun service désactivé</string>
+    <string name="no_static_services">Aucun service anormal</string>
     <string name="no_abnormal_services">Aucun service anormal</string>
     <string name="no_masked_services">Aucun service masqué</string>
 

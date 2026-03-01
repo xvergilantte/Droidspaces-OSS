@@ -49,7 +49,8 @@ import com.droidspaces.app.R
 private val ColorGreen = Color(0xFF4CAF50)
 private val ColorYellow = Color(0xFFFFCA28)
 private val ColorRed = Color(0xFFEF5350)
-private val ColorOrange = Color(0xFFFF7043)
+private val ColorStatic = Color(0xFF607D8B)
+private val ColorAbnormal = Color(0xFFFF7043)
 private val ColorWhite = Color(0xFFE0E0E0)
 
 // UI States
@@ -211,8 +212,9 @@ fun SystemdScreen(
         mapOf(
             ServiceFilter.RUNNING to allServices.count { it.isRunning && it.isEnabled && !it.isMasked },
             ServiceFilter.ENABLED to allServices.count { it.isEnabled && !it.isRunning && !it.isMasked },
-            ServiceFilter.DISABLED to allServices.count { !it.isEnabled && !it.isRunning && !it.isMasked },
-            ServiceFilter.ABNORMAL to allServices.count { it.isRunning && !it.isEnabled && !it.isMasked },
+            ServiceFilter.DISABLED to allServices.count { !it.isEnabled && !it.isRunning && !it.isMasked && !it.isStatic },
+            ServiceFilter.ABNORMAL to allServices.count { it.isRunning && !it.isEnabled && !it.isStatic && !it.isMasked },
+            ServiceFilter.STATIC to allServices.count { it.isStatic },
             ServiceFilter.MASKED to allServices.count { it.isMasked },
             ServiceFilter.ALL to allServices.size
         )
@@ -368,7 +370,8 @@ private fun ColorLegend(
             LegendItem(ColorGreen, context.getString(R.string.running_legend))
             LegendItem(ColorYellow, context.getString(R.string.enabled_legend))
             LegendItem(ColorRed, context.getString(R.string.disabled_legend))
-            LegendItem(ColorOrange, context.getString(R.string.abnormal_legend))
+            LegendItem(ColorAbnormal, context.getString(R.string.abnormal_legend))
+            LegendItem(ColorStatic, context.getString(R.string.static_legend))
             LegendItem(ColorWhite, context.getString(R.string.masked_legend))
         }
     }
@@ -462,7 +465,8 @@ private fun FilterChipsRow(
         FilterChipItem(context.getString(R.string.running_legend), serviceCounts[ServiceFilter.RUNNING] ?: 0, selectedFilter == ServiceFilter.RUNNING, ColorGreen) { onFilterSelected(ServiceFilter.RUNNING) }
         FilterChipItem(context.getString(R.string.enabled_legend), serviceCounts[ServiceFilter.ENABLED] ?: 0, selectedFilter == ServiceFilter.ENABLED, ColorYellow) { onFilterSelected(ServiceFilter.ENABLED) }
         FilterChipItem(context.getString(R.string.disabled_legend), serviceCounts[ServiceFilter.DISABLED] ?: 0, selectedFilter == ServiceFilter.DISABLED, ColorRed) { onFilterSelected(ServiceFilter.DISABLED) }
-        FilterChipItem(context.getString(R.string.abnormal_legend), serviceCounts[ServiceFilter.ABNORMAL] ?: 0, selectedFilter == ServiceFilter.ABNORMAL, ColorOrange) { onFilterSelected(ServiceFilter.ABNORMAL) }
+        FilterChipItem(context.getString(R.string.abnormal_legend), serviceCounts[ServiceFilter.ABNORMAL] ?: 0, selectedFilter == ServiceFilter.ABNORMAL, ColorAbnormal) { onFilterSelected(ServiceFilter.ABNORMAL) }
+        FilterChipItem(context.getString(R.string.static_legend), serviceCounts[ServiceFilter.STATIC] ?: 0, selectedFilter == ServiceFilter.STATIC, ColorStatic) { onFilterSelected(ServiceFilter.STATIC) }
         FilterChipItem(context.getString(R.string.masked_legend), serviceCounts[ServiceFilter.MASKED] ?: 0, selectedFilter == ServiceFilter.MASKED, ColorWhite) { onFilterSelected(ServiceFilter.MASKED) }
         FilterChipItem(context.getString(R.string.all_legend), serviceCounts[ServiceFilter.ALL] ?: 0, selectedFilter == ServiceFilter.ALL, null) { onFilterSelected(ServiceFilter.ALL) }
     }
@@ -516,7 +520,8 @@ private fun ServiceCard(
         ServiceStatus.ENABLED_RUNNING -> ColorGreen
         ServiceStatus.ENABLED_STOPPED -> ColorYellow
         ServiceStatus.DISABLED_STOPPED -> ColorRed
-        ServiceStatus.DISABLED_RUNNING -> ColorOrange
+        ServiceStatus.STATIC -> ColorStatic
+        ServiceStatus.ABNORMAL -> ColorAbnormal
         ServiceStatus.MASKED -> ColorWhite
     }
 
@@ -575,7 +580,8 @@ private fun ServiceCard(
                     color = when (service.status) {
                         ServiceStatus.ENABLED_RUNNING -> MaterialTheme.colorScheme.primaryContainer
                         ServiceStatus.ENABLED_STOPPED -> MaterialTheme.colorScheme.tertiaryContainer
-                        ServiceStatus.DISABLED_RUNNING -> MaterialTheme.colorScheme.errorContainer
+                        ServiceStatus.STATIC -> MaterialTheme.colorScheme.secondaryContainer
+                        ServiceStatus.ABNORMAL -> MaterialTheme.colorScheme.errorContainer
                         ServiceStatus.DISABLED_STOPPED -> MaterialTheme.colorScheme.surfaceContainerHighest
                         ServiceStatus.MASKED -> MaterialTheme.colorScheme.surfaceContainerHighest
                     }
@@ -584,7 +590,8 @@ private fun ServiceCard(
                         text = when (service.status) {
                             ServiceStatus.ENABLED_RUNNING -> context.getString(R.string.running_status)
                             ServiceStatus.ENABLED_STOPPED -> context.getString(R.string.enabled_status)
-                            ServiceStatus.DISABLED_RUNNING -> context.getString(R.string.abnormal_status)
+                            ServiceStatus.STATIC -> context.getString(R.string.static_status)
+                            ServiceStatus.ABNORMAL -> context.getString(R.string.abnormal_status)
                             ServiceStatus.DISABLED_STOPPED -> context.getString(R.string.disabled_status)
                             ServiceStatus.MASKED -> context.getString(R.string.masked_status)
                         },
@@ -594,7 +601,8 @@ private fun ServiceCard(
                         color = when (service.status) {
                             ServiceStatus.ENABLED_RUNNING -> MaterialTheme.colorScheme.onPrimaryContainer
                             ServiceStatus.ENABLED_STOPPED -> MaterialTheme.colorScheme.onTertiaryContainer
-                            ServiceStatus.DISABLED_RUNNING -> MaterialTheme.colorScheme.onErrorContainer
+                            ServiceStatus.STATIC -> MaterialTheme.colorScheme.onSecondaryContainer
+                            ServiceStatus.ABNORMAL -> MaterialTheme.colorScheme.onErrorContainer
                             else -> MaterialTheme.colorScheme.onSurfaceVariant
                         }
                     )
@@ -657,32 +665,34 @@ private fun ServiceCard(
                         }
                     }
 
-                    // Enable/Disable button
-                    if (service.isEnabled) {
-                        OutlinedButton(
-                            onClick = {
-                                clearFocus()
-                                onAction(context.getString(R.string.disable_service)) { ContainerSystemdManager.disableService(containerName, service.name) }
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.Block, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(context.getString(R.string.disable_service), style = MaterialTheme.typography.labelLarge)
-                        }
-                    } else {
-                        OutlinedButton(
-                            onClick = {
-                                clearFocus()
-                                onAction(context.getString(R.string.enable_service)) { ContainerSystemdManager.enableService(containerName, service.name) }
-                            },
-                            modifier = Modifier.weight(1f),
-                            shape = RoundedCornerShape(12.dp)
-                        ) {
-                            Icon(Icons.Default.CheckCircle, null, Modifier.size(18.dp))
-                            Spacer(Modifier.width(6.dp))
-                            Text(context.getString(R.string.enable_service), style = MaterialTheme.typography.labelLarge)
+                    // Enable/Disable button - Hidden for static services
+                    if (!service.isStatic) {
+                        if (service.isEnabled) {
+                            OutlinedButton(
+                                onClick = {
+                                    clearFocus()
+                                    onAction(context.getString(R.string.disable_service)) { ContainerSystemdManager.disableService(containerName, service.name) }
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.Block, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(context.getString(R.string.disable_service), style = MaterialTheme.typography.labelLarge)
+                            }
+                        } else {
+                            OutlinedButton(
+                                onClick = {
+                                    clearFocus()
+                                    onAction(context.getString(R.string.enable_service)) { ContainerSystemdManager.enableService(containerName, service.name) }
+                                },
+                                modifier = Modifier.weight(1f),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Icon(Icons.Default.CheckCircle, null, Modifier.size(18.dp))
+                                Spacer(Modifier.width(6.dp))
+                                Text(context.getString(R.string.enable_service), style = MaterialTheme.typography.labelLarge)
+                            }
                         }
                     }
 
@@ -844,6 +854,7 @@ private fun EmptyServicesState(filter: ServiceFilter, modifier: Modifier = Modif
                     ServiceFilter.RUNNING -> context.getString(R.string.no_running_services)
                     ServiceFilter.ENABLED -> context.getString(R.string.no_enabled_services)
                     ServiceFilter.DISABLED -> context.getString(R.string.no_disabled_services)
+                    ServiceFilter.STATIC -> context.getString(R.string.no_static_services)
                     ServiceFilter.ABNORMAL -> context.getString(R.string.no_abnormal_services)
                     ServiceFilter.MASKED -> context.getString(R.string.no_masked_services)
                 },
