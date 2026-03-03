@@ -9,7 +9,7 @@ logs/
 *.txt
 *.patch
 *.diff
-
+*.config
 
 # Keystores
 *.keystore

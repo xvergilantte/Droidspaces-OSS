@@ -474,9 +474,8 @@ int main(int argc, char **argv) {
     int prev_silent = ds_log_silent;
     ds_log_silent = 1;
     scan_containers();
-    ds_log_silent = prev_silent;
-
     load_config_with_recovery(cfg.container_name, &cfg);
+    ds_log_silent = prev_silent;
 
     pid_t pid = 0;
     if (is_container_running(&cfg, &pid) && pid > 0) {
@@ -522,10 +521,17 @@ int main(int argc, char **argv) {
   }
 
   if (strcmp(cmd, "run") == 0) {
+
+    /* We have to silence this to avoid glitches in the userspace Android app */
+    int prev_silent = ds_log_silent;
+    ds_log_silent = 1;
     if (load_config_with_recovery(cfg.container_name, &cfg) < 0) {
       ret = 1;
       goto cleanup;
     }
+    ds_log_silent = prev_silent;
+    /* Silencing complete */
+
     if (validate_kernel_version() < 0) {
       ret = 1;
       goto cleanup;
