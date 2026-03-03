@@ -133,8 +133,40 @@ int is_container_running(struct ds_config *cfg, pid_t *pid_out) {
   if (pid_out)
     *pid_out = pid;
 
-  if (ret == 0 && pid > 0) {
+  if (ret == 0 && pid > 0)
     return 1;
+
+  /*
+   * Fallback discovery:
+   * If the PID file check failed (stale, missing, or not-yet-validated)
+   * but we have a UUID, perform a deep discovery scan as the final authority.
+   */
+  if (cfg->uuid[0] != '\0') {
+    pid_t deep_pid = find_container_init_pid(cfg->uuid);
+    if (deep_pid > 0) {
+      if (pid_out)
+        *pid_out = deep_pid;
+
+      /* Self-healing: pidfile was missing or stale but container is
+       * confirmed alive via UUID scan. Restore it immediately so
+       * subsequent calls hit the fast pidfile path instead of scanning
+       * /proc again. Works even if the file was nuked externally. */
+      char pid_str[32];
+      snprintf(pid_str, sizeof(pid_str), "%d", deep_pid);
+
+      if (cfg->pidfile[0] != '\0') {
+        write_file_atomic(cfg->pidfile, pid_str);
+      } else if (cfg->container_name[0] != '\0') {
+        /* pidfile path itself was empty — resolve and restore both */
+        char restored_pidfile[PATH_MAX];
+        resolve_pidfile_from_name(cfg->container_name, restored_pidfile,
+                                  sizeof(restored_pidfile));
+        write_file_atomic(restored_pidfile, pid_str);
+        safe_strncpy(cfg->pidfile, restored_pidfile, sizeof(cfg->pidfile));
+      }
+
+      return 1;
+    }
   }
 
   return 0;
@@ -230,22 +262,30 @@ int auto_resolve_pidfile(struct ds_config *cfg) {
  * ---------------------------------------------------------------------------*/
 
 pid_t find_container_init_pid(const char *uuid) {
-  char marker[64];
-  snprintf(marker, sizeof(marker), "/run/%s", uuid);
+  if (!uuid || uuid[0] == '\0')
+    return 0;
 
-  pid_t *pids;
-  size_t count;
+  char marker[PATH_MAX];
+  snprintf(marker, sizeof(marker), "/run/droidspaces/%s", uuid);
+
+  pid_t *pids = NULL;
+  size_t count = 0;
   char path[PATH_MAX];
 
-  for (int retry = 0; retry < DS_PID_SCAN_RETRIES; retry++) {
-    if (collect_pids(&pids, &count) < 0)
+  if (collect_pids(&pids, &count) < 0)
+    return 0;
+
+  for (size_t i = 0; i < count; i++) {
+    /* Fast check: does /run/droidspaces exist?
+     * This avoids expensive deep path checks for host processes. */
+    if (build_proc_root_path(pids[i], "/run/droidspaces", path, sizeof(path)) <
+        0)
       continue;
 
-    for (size_t i = 0; i < count; i++) {
-      /* First check the UUID marker */
+    if (access(path, F_OK) == 0) {
+      /* Now check for the specific UUID marker */
       build_proc_root_path(pids[i], marker, path, sizeof(path));
       if (access(path, F_OK) == 0) {
-        /* Then perform stricter validation (cmdline, systemd marker) */
         if (is_valid_container_pid(pids[i])) {
           pid_t found = pids[i];
           free(pids);
@@ -253,10 +293,52 @@ pid_t find_container_init_pid(const char *uuid) {
         }
       }
     }
-    free(pids);
-    usleep(DS_PID_SCAN_DELAY_US);
   }
 
+  free(pids);
+  return 0;
+}
+
+pid_t find_container_by_name(const char *name) {
+  if (!name || name[0] == '\0')
+    return 0;
+
+  pid_t *pids = NULL;
+  size_t count = 0;
+  char path[PATH_MAX];
+
+  if (collect_pids(&pids, &count) < 0)
+    return 0;
+
+  for (size_t i = 0; i < count; i++) {
+    /* Fast check: does /run/droidspaces exist? */
+    if (build_proc_root_path(pids[i], "/run/droidspaces", path, sizeof(path)) <
+        0)
+      continue;
+
+    if (access(path, F_OK) != 0)
+      continue;
+
+    /* Read the tiny name marker — no config parse needed */
+    char name_marker[PATH_MAX];
+    char stored_name[256] = {0};
+    build_proc_root_path(pids[i], "/run/droidspaces/name", name_marker,
+                         sizeof(name_marker));
+
+    if (read_file(name_marker, stored_name, sizeof(stored_name)) >= 0) {
+      /* Strip trailing newline if any */
+      stored_name[strcspn(stored_name, "\n")] = '\0';
+
+      if (strcmp(stored_name, name) == 0 && is_valid_container_pid(pids[i])) {
+        pid_t found = pids[i];
+        free(pids);
+        return found;
+      }
+    }
+  }
+
+  if (pids)
+    free(pids);
   return 0;
 }
 
@@ -436,8 +518,6 @@ int scan_containers(void) {
       if (!is_pid_file(ent->d_name))
         continue;
       char pf[PATH_MAX];
-      /* Use precision to satisfy GCC -Werror=format-truncation while keeping
-       * explicit return value checks for safety. */
       int n = snprintf(pf, sizeof(pf), "%.2048s/%.256s", get_pids_dir(),
                        ent->d_name);
       if (n >= (int)sizeof(pf)) {
@@ -448,7 +528,6 @@ int scan_containers(void) {
       pid_t p;
       if (read_and_validate_pid(pf, &p) == 0) {
         tracked[tracked_count++] = p;
-        /* Also capture the mount path if tracked */
         if (tracked_mount_count < DS_MAX_TRACKED_ENTRIES) {
           if (read_mount_path(pf, tracked_mounts[tracked_mount_count],
                               PATH_MAX) > 0)
@@ -489,18 +568,31 @@ int scan_containers(void) {
       snprintf(proc_root, sizeof(proc_root), "/proc/%d/root", pid);
 
       char base_name[128], final_name[128];
-      if (generate_container_name(proc_root, base_name, sizeof(base_name)) ==
-          0) {
-        if (find_available_name(base_name, final_name, sizeof(final_name)) ==
-            0) {
-          char pf[PATH_MAX];
-          resolve_pidfile_from_name(final_name, pf, sizeof(pf));
-          char pid_str[32];
-          snprintf(pid_str, sizeof(pid_str), "%d", pid);
-          if (write_file(pf, pid_str) == 0) {
-            ds_log("Tracked untracked container: '%s' (PID %d)", final_name,
-                   pid);
-          }
+
+      /* Prefer the in-container name marker — preserves exact original name
+       * including case and spaces (e.g. "Ubuntu 22.04" not "ubuntu-22.04").
+       * Fall back to os-release derivation for pre-marker containers. */
+      char name_marker_path[PATH_MAX];
+      build_proc_root_path(pid, "/run/droidspaces/name", name_marker_path,
+                           sizeof(name_marker_path));
+
+      if (read_file(name_marker_path, base_name, sizeof(base_name)) >= 0) {
+        /* Strip trailing newline */
+        base_name[strcspn(base_name, "\n")] = '\0';
+      } else if (generate_container_name(proc_root, base_name,
+                                         sizeof(base_name)) != 0) {
+        /* Can't determine name at all — skip this container */
+        ds_warn("Could not determine name for PID %d, skipping.", pid);
+        continue;
+      }
+
+      if (find_available_name(base_name, final_name, sizeof(final_name)) == 0) {
+        char pf[PATH_MAX];
+        resolve_pidfile_from_name(final_name, pf, sizeof(pf));
+        char pid_str[32];
+        snprintf(pid_str, sizeof(pid_str), "%d", pid);
+        if (write_file(pf, pid_str) == 0) {
+          ds_log("Tracked untracked container: '%s' (PID %d)", final_name, pid);
         }
       }
       untracked_found++;
@@ -536,7 +628,6 @@ int scan_containers(void) {
           orphaned_found++;
         }
       } else {
-        /* If it's just an empty directory in /mnt/Droidspaces, clean it too */
         rmdir(mpath);
       }
     }

@@ -287,6 +287,7 @@ int ds_config_add_bind(struct ds_config *cfg, const char *src,
                        const char *dest);
 void free_config_binds(struct ds_config *cfg);
 char *ds_config_auto_path(const char *rootfs_path);
+int load_config_with_recovery(const char *name, struct ds_config *cfg);
 
 /* ---------------------------------------------------------------------------
  * android.c
@@ -388,6 +389,7 @@ int is_container_running(struct ds_config *cfg, pid_t *pid_out);
 int is_container_init(pid_t pid);
 int count_running_containers(char *first_name, size_t size);
 pid_t find_container_init_pid(const char *uuid);
+pid_t find_container_by_name(const char *name);
 int sync_pidfile(const char *src_pidfile, const char *name);
 int show_containers(void);
 int scan_containers(void);

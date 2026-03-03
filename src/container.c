@@ -75,9 +75,131 @@ static void release_external_lock(const char *name) {
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Configuration & Metadata Recovery
+ * ---------------------------------------------------------------------------*/
+
+/**
+ * Enhanced config loader that performs a global /proc scan if host metadata
+ * is missing.
+ *
+ * returns: 0 on success (config loaded/restored), -1 on fatal failure.
+ */
+
+/* Mirrors ContainerManager.sanitizeContainerName() in the Android app.
+ * Replaces spaces with dashes so directory names are consistent. */
+static void sanitize_container_name(const char *name, char *out, size_t size) {
+  size_t i;
+  for (i = 0; i < size - 1 && name[i] != '\0'; i++)
+    out[i] = (name[i] == ' ') ? '-' : name[i];
+  out[i] = '\0';
+}
+
+int load_config_with_recovery(const char *name, struct ds_config *cfg) {
+  if (!name || name[0] == '\0')
+    return -1;
+
+  ensure_workspace();
+
+  char safe_name[256];
+  sanitize_container_name(name, safe_name, sizeof(safe_name));
+
+  /* Step 2: Try to resolve host-side config path if not already set */
+  if (cfg->config_file[0] == '\0') {
+    snprintf(cfg->config_file, sizeof(cfg->config_file),
+             "%s/Containers/%s/container.config", get_workspace_dir(),
+             safe_name);
+  }
+
+  /* Step 3: Try to load from host workspace */
+  if (ds_config_load(cfg->config_file, cfg) == 0 && cfg->config_file_existed) {
+    if (cfg->container_name[0] && strcmp(cfg->container_name, name) != 0) {
+      /* name mismatch — fall through */
+    } else {
+      if (!cfg->container_name[0])
+        safe_strncpy(cfg->container_name, name, sizeof(cfg->container_name));
+      return 0;
+    }
+  }
+
+  /* Step 3.5: Workspace config missing, but the pidfile may point us directly
+   * to a live PID — avoids full /proc scan for containers started with an
+   * external --conf= path where no workspace config was ever written. */
+  char direct_pidfile[PATH_MAX];
+  resolve_pidfile_from_name(safe_name, direct_pidfile, sizeof(direct_pidfile));
+
+  pid_t direct_pid = 0;
+  if (read_and_validate_pid(direct_pidfile, &direct_pid) == 0 &&
+      direct_pid > 0) {
+    char internal_config[PATH_MAX];
+    build_proc_root_path(direct_pid, "/run/droidspaces/container.config",
+                         internal_config, sizeof(internal_config));
+
+    if (ds_config_load(internal_config, cfg) == 0) {
+      ds_log("Recovering metadata for '%s' from internal backup (PID %d).",
+             name, direct_pid);
+      char container_dir[PATH_MAX];
+      snprintf(container_dir, sizeof(container_dir), "%s/Containers/%s",
+               get_workspace_dir(), safe_name);
+      mkdir_p(container_dir, 0755);
+      ds_config_save(cfg->config_file, cfg);
+    } else {
+      /* No internal backup (pre-marker container) — populate minimal cfg */
+      ds_log("No internal backup for '%s' — using minimal config (PID %d).",
+             name, direct_pid);
+      safe_strncpy(cfg->container_name, name, sizeof(cfg->container_name));
+      safe_strncpy(cfg->pidfile, direct_pidfile, sizeof(cfg->pidfile));
+    }
+    return 0;
+  }
+
+  /* Step 4: No workspace config and no pidfile — full /proc scan last resort */
+  ds_log("Metadata for '" C_BOLD "%s" C_RESET "' is missing. Scanning /proc...",
+         name);
+  pid_t pid = find_container_by_name(name);
+  if (pid <= 0) {
+    ds_error("Container '%s' not found on system.", name);
+    return -1;
+  }
+
+  char internal_config[PATH_MAX];
+  build_proc_root_path(pid, "/run/droidspaces/container.config",
+                       internal_config, sizeof(internal_config));
+
+  if (ds_config_load(internal_config, cfg) < 0) {
+    ds_error("Failed to load internal backup config for '%s'.", name);
+    return -1;
+  }
+
+  if (strcmp(cfg->container_name, name) != 0) {
+    ds_error(
+        "Discovery mismatch: expected '%s', found '%s'. Aborting recovery.",
+        name, cfg->container_name);
+    return -1;
+  }
+
+  ds_log("Found running container '" C_BOLD "%s" C_RESET "' (PID %d).", name,
+         pid);
+  ds_log("Restoring host-side metadata...");
+
+  char container_dir[PATH_MAX];
+  snprintf(container_dir, sizeof(container_dir), "%s/Containers/%s",
+           get_workspace_dir(), safe_name);
+  mkdir_p(container_dir, 0755);
+  ds_config_save(cfg->config_file, cfg);
+
+  resolve_pidfile_from_name(name, cfg->pidfile, sizeof(cfg->pidfile));
+  char pid_str[32];
+  snprintf(pid_str, sizeof(pid_str), "%d", pid);
+  write_file(cfg->pidfile, pid_str);
+
+  ds_log("Metadata restored successfully. Continuing...");
+  return 0;
+}
+
 /* Check if external command lock exists — called by monitor (READ ONLY).
  * Returns: 1 if lock exists and holder is alive, 0 otherwise. */
-static int is_external_lock_active(const char *name) {
+int is_external_lock_active(const char *name) {
   char lock_path[PATH_MAX];
   get_lock_path(name, lock_path, sizeof(lock_path));
 

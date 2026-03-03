@@ -239,12 +239,19 @@ int internal_boot(struct ds_config *cfg) {
       ds_warn("Failed to bind mount '%s': %s", tty_target, strerror(errno));
   }
 
-  /* 14. Write UUID marker for PID discovery */
+  /* 14. Write identity markers for PID discovery */
+  mkdir("run/droidspaces", 0755);
   char marker[PATH_MAX];
-  snprintf(marker, sizeof(marker), "run/%s", cfg->uuid);
-  write_file(marker, "init");
-  write_file(&DS_DROIDSPACES_MARKER[1],
-             DS_VERSION); /* skip leading / for relative write */
+  snprintf(marker, sizeof(marker), "run/droidspaces/%s", cfg->uuid);
+  write_file(marker, ""); /* empty UUID marker */
+
+  /* Save a mirror of the config and the name inside /run for metadata recovery
+   */
+  ds_config_save("run/droidspaces/container.config", cfg);
+  write_file("run/droidspaces/name", cfg->container_name);
+
+  /* Legacy compatibility: write version to the marker directory root */
+  write_file("run/droidspaces/version", DS_VERSION);
 
   /* 15. Android-specific storage */
   if (cfg->android_storage) {

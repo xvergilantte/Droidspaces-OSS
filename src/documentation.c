@@ -29,8 +29,8 @@ static const char *get_binary_name(const char *argv0) {
 #define SHOW_CURSOR "\033[?25h"
 
 /* Page titles */
-static const char *page_titles[] = {
-    "Basic Usage", "Medium Usage", "Advanced Usage", "Gigachad Usage", "Notes"};
+static const char *page_titles[] = {"Basic Usage", "Medium Usage",
+                                    "Advanced Usage", "Expert Usage", "Notes"};
 
 /* Total number of pages */
 #define TOTAL_PAGES 5
@@ -297,12 +297,10 @@ static void print_page(int page, const char *bin) {
     printf("  %s --name=myimage --rootfs-img=/path/to/rootfs.img start\n\n",
            bin);
 
-    printf("%sUsing PID file:%s\n", bold, reset);
-    printf("  %s --pidfile=/custom/path/container.pid --rootfs=/path/to/rootfs "
-           "start\n",
-           bin);
-    printf("  %s --pidfile=./mycontainer.pid status\n", bin);
-    printf("  %s --pidfile=/custom/path/container.pid stop\n\n", bin);
+    printf("%sMetadata Recovery:%s\n", bold, reset);
+    printf("  %s --name=mycontainer info\n", bin);
+    printf(
+        "  (Even if host-side config/PIDs are lost, discovery finds it!)\n\n");
 
     printf("%sEntering as different user:%s\n", bold, reset);
     printf("  %s --name=mycontainer enter myuser\n\n", bin);
@@ -321,7 +319,7 @@ static void print_page(int page, const char *bin) {
 
   case 3: /* Gigachad Usage */
     printf("\n");
-    printf("GIGACHAD USAGE\n");
+    printf("EXPERT USAGE\n");
     printf("--------------\n\n");
 
     printf("%sEphemeral container (Volatile Mode):%s\n", bold, reset);
@@ -412,14 +410,14 @@ static void print_page(int page, const char *bin) {
     printf("\n");
     printf("NOTES\n");
     printf("-----\n\n");
-    printf("1. --name and --pidfile are mutually exclusive\n");
+    printf("1. Container names are auto-generated if --name is omitted\n");
     printf("2. --rootfs and --rootfs-img are mutually exclusive\n");
     printf("3. Only one command can be specified at a time\n");
     printf(
         "4. Multi-stop (comma-separated names) only works with stop command\n");
     printf("5. Container names are auto-generated from /etc/os-release if "
            "--name is not provided\n");
-    printf("6. PID files are stored in workspace directory\n");
+    printf("6. Persistent UUIDs ensure containers are always trackable\n");
     printf("7. Rootfs images are automatically mounted and unmounted\n");
     printf(
         "8. The scan command can detect containers started outside the tool\n");

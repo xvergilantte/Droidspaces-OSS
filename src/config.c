@@ -219,6 +219,8 @@ int ds_config_load(const char *config_path, struct ds_config *cfg) {
         continue;
       }
       safe_strncpy(cfg->env_file, val, sizeof(cfg->env_file));
+    } else if (strcmp(key, "uuid") == 0) {
+      safe_strncpy(cfg->uuid, val, sizeof(cfg->uuid));
     }
   }
 
@@ -241,6 +243,7 @@ static const char *KNOWN_KEYS[] = {"name",
                                    "bind_mounts",
                                    "dns_servers",
                                    "env_file",
+                                   "uuid",
                                    NULL};
 
 /* Linked list to store unknown key-value pairs from existing config */
@@ -352,6 +355,8 @@ int ds_config_save(const char *config_path, struct ds_config *cfg) {
 
   if (cfg->env_file[0])
     fprintf(f_out, "env_file=%s\n", cfg->env_file);
+  if (cfg->uuid[0])
+    fprintf(f_out, "uuid=%s\n", cfg->uuid);
 
   if (cfg->dns_servers[0])
     fprintf(f_out, "dns_servers=%s\n", cfg->dns_servers);
