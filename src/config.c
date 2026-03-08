@@ -314,7 +314,10 @@ int ds_config_load(const char *config_path, struct ds_config *cfg) {
         ds_warn(
             "config: too many port_forwards (max %d) — extra entries ignored",
             DS_MAX_PORT_FORWARDS);
-      /* Preservation: Capture unknown key-value pairs for Android metadata */
+    } else {
+      /* Unknown key — preserve verbatim so Android App metadata
+       * (run_at_boot, use_sparse_image, sparse_image_size_gb, etc.)
+       * survives ds_config_save() unchanged. */
       add_unknown_line(cfg, line);
     }
   }
