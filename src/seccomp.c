@@ -58,6 +58,15 @@ int ds_seccomp_apply_minimal(int hw_access) {
       BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
 #endif
 
+#ifdef __NR_clone3
+      /* Block clone3 to force fallback to clone. Seccomp cannot inspect
+       * clone3's struct arguments (since it cannot dereference pointers),
+       * making it a bypass vector for our clone/unshare flag filters. */
+      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_clone3, 0, 1),
+      BPF_STMT(BPF_RET | BPF_K,
+               SECCOMP_RET_ERRNO | (ENOSYS & SECCOMP_RET_DATA)),
+#endif
+
       /* unshare(CLONE_NEWUSER) - a new user namespace grants a full capability
        * set within it, enabling further kernel exploits.
        * Block the CLONE_NEWUSER flag only - systemd legitimately calls
