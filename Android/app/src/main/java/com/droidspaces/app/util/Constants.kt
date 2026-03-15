@@ -42,6 +42,11 @@ object Constants {
     const val MIN_STORAGE_GB = 4
 
 
+    // NAT Networking constants
+    const val NAT_IP_PREFIX = "172.28"
+    const val NAT_OCTET_MIN = 1
+    const val NAT_OCTET_MAX = 254
+
     // Maximum DNS servers
     const val MAX_DNS_SERVERS = 8
 

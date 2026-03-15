@@ -197,6 +197,11 @@
     <string name="saved">Saved</string>
     <string name="saving">Saving...</string>
     <string name="save_changes">Save Changes</string>
+    <string name="static_ip_address">Static IP Address</string>
+    <string name="static_ip_description">Set a static IPv4 for this container within the 172.28.x.x subnet.</string>
+    <string name="octet_label">Octet %1$d</string>
+    <string name="error_octet_range">Range: 1-254</string>
+    <string name="error_ip_collision">This IP is already assigned to \"%1$s\"</string>
     <string name="failed_to_update_config">Failed to update configuration</string>
     <string name="volatile_mode">Volatile Mode</string>
     <string name="volatile_mode_description">RAM-only mode (changes vanish after stop)</string>

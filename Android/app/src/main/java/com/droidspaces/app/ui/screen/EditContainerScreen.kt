@@ -11,6 +11,8 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.material.ripple.rememberRipple
 import androidx.compose.runtime.*
 import com.droidspaces.app.ui.util.LoadingIndicator
@@ -29,6 +31,7 @@ import com.droidspaces.app.ui.component.ToggleCard
 import com.droidspaces.app.util.ContainerInfo
 import com.droidspaces.app.util.ContainerManager
 import com.droidspaces.app.util.SystemInfoManager
+import com.droidspaces.app.util.Constants
 import com.droidspaces.app.ui.viewmodel.ContainerViewModel
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -82,6 +85,7 @@ fun EditContainerScreen(
     var portForwards by remember { mutableStateOf(container.portForwards) }
     var forceCgroupv1 by remember { mutableStateOf(container.forceCgroupv1) }
     var blockNestedNs by remember { mutableStateOf(container.blockNestedNs) }
+    var staticNatIp by remember { mutableStateOf(container.staticNatIp) }
 
     // Track the "saved" baseline values - updated after each successful save
     var savedHostname by remember { mutableStateOf(container.hostname) }
@@ -100,6 +104,7 @@ fun EditContainerScreen(
     var savedPortForwards by remember { mutableStateOf(container.portForwards) }
     var savedForceCgroupv1 by remember { mutableStateOf(container.forceCgroupv1) }
     var savedBlockNestedNs by remember { mutableStateOf(container.blockNestedNs) }
+    var savedStaticNatIp by remember { mutableStateOf(container.staticNatIp) }
 
     // Navigation and internal UI states
     var showFilePicker by remember { mutableStateOf(false) }
@@ -134,7 +139,8 @@ fun EditContainerScreen(
             upstreamInterfaces != savedUpstreamInterfaces ||
             portForwards != savedPortForwards ||
             forceCgroupv1 != savedForceCgroupv1 ||
-            blockNestedNs != savedBlockNestedNs
+            blockNestedNs != savedBlockNestedNs ||
+            staticNatIp != savedStaticNatIp
         }
     }
 
@@ -169,7 +175,8 @@ fun EditContainerScreen(
                     upstreamInterfaces = upstreamInterfaces,
                     portForwards = portForwards,
                     forceCgroupv1 = forceCgroupv1,
-                    blockNestedNs = blockNestedNs
+                    blockNestedNs = blockNestedNs,
+                    staticNatIp = staticNatIp
                 )
 
                 // Update config file
@@ -196,6 +203,7 @@ fun EditContainerScreen(
                         savedPortForwards = portForwards
                         savedForceCgroupv1 = forceCgroupv1
                         savedBlockNestedNs = blockNestedNs
+                        savedStaticNatIp = staticNatIp
 
                         // Refresh container list and SELinux status using ViewModel
                         containerViewModel.refresh()
@@ -491,6 +499,111 @@ fun EditContainerScreen(
                         color = MaterialTheme.colorScheme.primary
                     )
 
+                    // Static IP Address Configuration
+                    Text(
+                        text = context.getString(R.string.static_ip_address),
+                        style = MaterialTheme.typography.bodyLarge,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(top = 16.dp)
+                    )
+                    Text(
+                        text = context.getString(R.string.static_ip_description),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.secondary,
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+
+                    val octets = remember(staticNatIp) {
+                        val parts = staticNatIp.split(".")
+                        if (parts.size == 4) {
+                            Pair(parts[2], parts[3])
+                        } else {
+                            Pair("", "")
+                        }
+                    }
+
+                    var octet3 by remember(octets) { mutableStateOf(octets.first) }
+                    var octet4 by remember(octets) { mutableStateOf(octets.second) }
+
+                    val updateIp = { o3: String, o4: String ->
+                        staticNatIp = if (o3.isBlank() && o4.isBlank()) {
+                            ""
+                        } else {
+                            "${Constants.NAT_IP_PREFIX}.$o3.$o4"
+                        }
+                    }
+
+                    val isOctet3Valid = remember(octet3) {
+                        octet3.isEmpty() || (octet3.toIntOrNull()?.let { it in Constants.NAT_OCTET_MIN..Constants.NAT_OCTET_MAX } ?: false)
+                    }
+                    val isOctet4Valid = remember(octet4) {
+                        octet4.isEmpty() || (octet4.toIntOrNull()?.let { it in Constants.NAT_OCTET_MIN..Constants.NAT_OCTET_MAX } ?: false)
+                    }
+
+                    val collisionContainer = remember(staticNatIp) {
+                        if (staticNatIp.isEmpty()) null
+                        else containerViewModel.containerList.find { it.name != container.name && it.staticNatIp == staticNatIp }
+                    }
+
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text(
+                            text = "${Constants.NAT_IP_PREFIX}.",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+
+                        OutlinedTextField(
+                            value = octet3,
+                            onValueChange = {
+                                if (it.length <= 3 && it.all { c -> c.isDigit() }) {
+                                    octet3 = it
+                                    updateIp(it, octet4)
+                                }
+                            },
+                            label = { Text(context.getString(R.string.octet_label, 3)) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            isError = !isOctet3Valid,
+                            supportingText = { if (!isOctet3Valid) Text(context.getString(R.string.error_octet_range)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+
+                        Text(
+                            text = ".",
+                            style = MaterialTheme.typography.bodyLarge,
+                            modifier = Modifier.padding(top = 8.dp)
+                        )
+
+                        OutlinedTextField(
+                            value = octet4,
+                            onValueChange = {
+                                if (it.length <= 3 && it.all { c -> c.isDigit() }) {
+                                    octet4 = it
+                                    updateIp(octet3, it)
+                                }
+                            },
+                            label = { Text(context.getString(R.string.octet_label, 4)) },
+                            modifier = Modifier.weight(1f),
+                            singleLine = true,
+                            isError = !isOctet4Valid,
+                            supportingText = { if (!isOctet4Valid) Text(context.getString(R.string.error_octet_range)) },
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
+                        )
+                    }
+
+                    if (collisionContainer != null) {
+                        Text(
+                            text = context.getString(R.string.error_ip_collision, collisionContainer.name),
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodySmall,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                    }
+
                     // Upstream Interfaces
                     val isUpstreamValid = upstreamInterfaces.isNotEmpty()
                     Text(
@@ -758,7 +871,8 @@ fun EditContainerScreen(
                                                 label = { Text(context.getString(R.string.host_port_hint)) },
                                                 singleLine = true,
                                                 modifier = Modifier.fillMaxWidth(),
-                                                isError = !isHostValid
+                                                isError = !isHostValid,
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                             )
                                             
                                             OutlinedTextField(
@@ -767,7 +881,8 @@ fun EditContainerScreen(
                                                 label = { Text(context.getString(R.string.container_port_hint)) },
                                                 singleLine = true,
                                                 modifier = Modifier.fillMaxWidth(),
-                                                isError = !isContainerValid
+                                                isError = !isContainerValid,
+                                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number)
                                             )
                                             
                                             ExposedDropdownMenuBox(
