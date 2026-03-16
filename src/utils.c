@@ -703,8 +703,10 @@ static void write_to_log_file(const char *name, const char *component,
     return;
 
   char log_dir[PATH_MAX];
+  char safe_log_name[256];
+  sanitize_container_name(name, safe_log_name, sizeof(safe_log_name));
   snprintf(log_dir, sizeof(log_dir), "%.2048s/" DS_LOGS_SUBDIR "/%.256s",
-           get_workspace_dir(), name);
+           get_workspace_dir(), safe_log_name);
   mkdir_p(log_dir, 0755);
 
   char log_path[PATH_MAX];

@@ -954,6 +954,26 @@ int start_rootfs(struct ds_config *cfg) {
 
     /* Normal exit — monitor does cleanup */
     write_monitor_debug_log(cfg->container_name, "Monitor performing cleanup");
+
+    /* Before cleaning up the container's cgroup subtree, move the
+     * monitor process itself back to the root cgroup.  The monitor wrote its
+     * own PID into /sys/fs/cgroup/droidspaces/<name>/ at start (for cgroup
+     * namespace isolation).  If it is still in that cgroup when
+     * ds_cgroup_cleanup_container() calls rmdir, the kernel sees a non-empty
+     * cgroup and returns EBUSY - the directory is never removed.
+     *
+     * Writing our PID to the root cgroup.procs atomically migrates us out.
+     * This is safe: the monitor is about to _exit() anyway. */
+    {
+      int root_fd = open("/sys/fs/cgroup/cgroup.procs", O_WRONLY | O_CLOEXEC);
+      if (root_fd >= 0) {
+        char pid_s[32];
+        int len = snprintf(pid_s, sizeof(pid_s), "%d", (int)getpid());
+        write(root_fd, pid_s, len);
+        close(root_fd);
+      }
+    }
+
     cleanup_container_resources(cfg, 0, 0, 0);
 
   monitor_cleanup_and_exit:
