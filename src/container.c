@@ -246,7 +246,6 @@ static void cleanup_container_resources(struct ds_config *cfg, pid_t pid,
 
 int is_valid_container_pid(pid_t pid) {
   char path[PATH_MAX];
-  char buf[256];
 
   /* Primary marker: /run/droidspaces must exist inside the container.
    * This is the one authoritative marker written by droidspaces on boot.
@@ -257,12 +256,10 @@ int is_valid_container_pid(pid_t pid) {
   if (access(path, F_OK) != 0)
     return 0;
 
-  /* Secondary check: cmdline must contain "init" (any init system).
-   * Accepts: /sbin/init, /bin/init, /usr/bin/runit-init, /bin/openrc-init */
-  snprintf(path, sizeof(path), DS_PROC_CMDLINE_FMT, pid);
-  if (read_file(path, buf, sizeof(buf)) < 0)
-    return 0;
-  if (!strstr(buf, "init"))
+  /* Secondary check: process must be the init (PID 1) of its namespace.
+   * This is more robust than checking cmdline for "init" which distros
+   * like Void Linux (runit) or Alpine may not provide. */
+  if (!is_container_init(pid))
     return 0;
 
   return 1;
