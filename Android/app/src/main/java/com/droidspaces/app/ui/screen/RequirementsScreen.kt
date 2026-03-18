@@ -226,6 +226,8 @@ private fun ExpandableKernelRequirementsSection(
             if (isExpanded) {
                 CodeBox(
                     code = """# Kernel configurations for full DroidSpaces support
+# optional kernel configurations for UFW/Fail2ban:
+# https://github.com/ravindu644/Droidspaces-OSS/blob/main/Documentation/Kernel-Configuration.md#additional-kernel-configuration-for-ufwfail2ban
 # Copyright (C) 2026 ravindu644 <droidcasts@protonmail.com>
 
 # IPC mechanisms (required for tools that rely on shared memory and IPC namespaces)
