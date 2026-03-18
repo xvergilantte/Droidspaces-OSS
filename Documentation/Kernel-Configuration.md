@@ -13,6 +13,7 @@ This guide explains how to compile a Linux kernel with Droidspaces support for A
 
 - [Overview](#overview)
 - [Required Kernel Configuration](#kernel-config)
+- [Additional Kernel Configuration for UFW/Fail2ban](#additional-kernel-config)
 - [Recommended Kernel Patches](#kernel-patches)
 - [Configuring Non-GKI Kernels](#non-gki)
 - [Configuring GKI Kernels](#gki)
@@ -62,6 +63,11 @@ CONFIG_CGROUPS=y
 CONFIG_CGROUP_DEVICE=y
 CONFIG_CGROUP_PIDS=y
 CONFIG_MEMCG=y
+CONFIG_CGROUP_SCHED=y
+CONFIG_FAIR_GROUP_SCHED=y
+CONFIG_CFS_BANDWIDTH=y
+CONFIG_CGROUP_FREEZER=y
+CONFIG_CGROUP_NET_PRIO=y
 
 # Device filesystem support (enables hardware access when --hw-access is enabled)
 CONFIG_DEVTMPFS=y
@@ -112,6 +118,13 @@ CONFIG_NETFILTER_XT_TARGET_MASQUERADE=y
 # MSS clamping
 CONFIG_NETFILTER_XT_TARGET_TCPMSS=y
 
+# addrtype match (required for --dst-type LOCAL DNAT port forwarding)
+CONFIG_NETFILTER_XT_MATCH_ADDRTYPE=y
+
+# Conntrack netlink + NAT redirect (required for stateful NAT)
+CONFIG_NF_CONNTRACK_NETLINK=y
+CONFIG_NF_NAT_REDIRECT=y
+
 # Policy routing
 CONFIG_IP_ADVANCED_ROUTER=y
 CONFIG_IP_MULTIPLE_TABLES=y
@@ -151,6 +164,51 @@ CONFIG_ANDROID_PARANOID_NETWORK=n
 
 ---
 
+<a id="additional-kernel-config"></a>
+## Additional Kernel Configuration for UFW/Fail2ban
+
+> [!TIP]
+> These kernel configurations are not strictly required, but they serve a specific purpose if you want to use a firewall inside a Droidspaces container in NAT mode.
+
+**It's recommended to use NAT mode for UFW/Fail2ban,** as these tools will conflict with host networking if run in host mode.
+
+Save this block as `droidspaces-additional.config` and place it under your kernel's architecture configs folder (e.g., `arch/arm64/configs/`):
+
+```makefile
+# UFW CORE
+CONFIG_NETFILTER_XT_MATCH_COMMENT=y
+CONFIG_NETFILTER_XT_MATCH_STATE=y
+CONFIG_NETFILTER_XT_MATCH_CONNTRACK=y
+CONFIG_NETFILTER_XT_MATCH_MULTIPORT=y
+CONFIG_NETFILTER_XT_MATCH_HL=y
+CONFIG_NETFILTER_XT_TARGET_REJECT=y
+CONFIG_IP_NF_TARGET_REJECT=y
+CONFIG_NETFILTER_XT_TARGET_LOG=y
+CONFIG_IP_NF_TARGET_ULOG=y
+
+# FAIL2BAN CORE
+CONFIG_NETFILTER_XT_MATCH_RECENT=y
+CONFIG_NETFILTER_XT_MATCH_LIMIT=y
+CONFIG_NETFILTER_XT_MATCH_HASHLIMIT=y
+CONFIG_NETFILTER_XT_MATCH_OWNER=y
+CONFIG_NETFILTER_XT_MATCH_PKTTYPE=y
+CONFIG_NETFILTER_XT_MATCH_MARK=y
+CONFIG_NETFILTER_XT_TARGET_MARK=y
+
+# IPSET (efficient fail2ban banlists)
+CONFIG_IP_SET=y
+CONFIG_IP_SET_HASH_IP=y
+CONFIG_IP_SET_HASH_NET=y
+CONFIG_NETFILTER_XT_SET=y
+
+# NFNETLINK / logging
+CONFIG_NETFILTER_NETLINK_QUEUE=y
+CONFIG_NETFILTER_NETLINK_LOG=y
+CONFIG_NETFILTER_XT_TARGET_NFLOG=y
+```
+
+---
+
 <a id="kernel-patches"></a>
 ## Recommended Kernel Patches
 
@@ -171,14 +229,15 @@ Applying these patches helps avoid "weird issues" and kernel panics that can occ
 
 These kernels are the simplest to configure. The process is straightforward:
 
-### Step 1: Prepare the Fragment
+### Step 1: Prepare the Fragments
 
-Ensure you have saved the configuration block from the [Required Configuration](#kernel-config) section as `droidspaces.config` in your architecture's config directory.
+Ensure you have saved the configuration blocks from the [Required Configuration](#kernel-config) and [Additional Kernel Configuration](#additional-kernel-config) (optional) sections as `droidspaces.config` and `droidspaces-additional.config` in your architecture's config directory.
 
 ```bash
 # Example for ARM64
 # Place it alongside your device's defconfig
 # $KERNEL_ROOT/arch/arm64/configs/droidspaces.config
+# $KERNEL_ROOT/arch/arm64/configs/droidspaces-additional.config
 ```
 
 ### Step 2: Apply Recommended Patches (Optional but Recommended)
@@ -196,7 +255,7 @@ When generating your initial configuration, provide both your device's `defconfi
 
 ```bash
 # General syntax
-make [BUILD_OPTIONS] <your_device>_defconfig droidspaces.config
+make [BUILD_OPTIONS] <your_device>_defconfig droidspaces.config droidspaces-additional.config
 ```
 
 > [!NOTE]
@@ -225,7 +284,7 @@ GKI kernels enforce a strict ABI (Application Binary Interface) between the kern
 
 ### Required Additional Steps
 
-1. **Disable module simversioning** to prevent module loading failures
+1. **Disable module symbol versioning** to prevent module loading failures
 2. **Handle ABI breakage** by rebuilding affected vendor modules or bypassing ABI checks
 
 > [!WARNING]
@@ -282,7 +341,7 @@ This checks for:
 | OverlayFS | `CONFIG_OVERLAY_FS` | Volatile mode unavailable. |
 | Network namespace | `CONFIG_NET_NS=y` | NAT and None modes unavailable. |
 | VETH / Bridge | `CONFIG_VETH` / `CONFIG_BRIDGE` | NAT mode isolation unavailable. |
-| Seccomp | `CONFIG_SECCOMP=y` | Seccomp shield disabled; will cause boot crashes on legacy kernels. |
+| Seccomp | `CONFIG_SECCOMP=y` | Seccomp shield disabled; will cause security risks. |
 
 ---
 
@@ -292,7 +351,7 @@ This checks for:
 | Version | Support | Notes |
 |---------|---------|-------|
 | 3.18 | Legacy | **Minimum floor.** Basic namespace support. Modern distros are unstable or won't even boot. |
-| 4.4 - 4.19 | Stable | **Hardened.** Full support. Nested containers (Docker/Podman) are natively supported. If you encounter systemd hangs on specific kernels (like 4.14.113) due to the VFS deadlock bug, try enabling the "Deadlock Shield" on App/`--block-nested-namespaces` in CLI, hard reboot your device, and try again. |
+| 4.4 - 4.19 | Stable | **Hardened.** Full support. Nested containers (Docker/Podman) are natively supported. If you encounter systemd hangs on specific kernels (like 4.14.113) due to the VFS deadlock bug, try enabling the "Deadlock Shield" in the App or `--block-nested-namespaces` in the CLI, hard reboot your device, and try again. |
 | 5.4 - 5.10 | Recommended | **Mainline.** Full feature support, including nested containers and modern Cgroup v2. |
 | 5.15+ | Ideal | **Premium.** All features, best performance, and widest compatibility. |
 
@@ -307,7 +366,7 @@ Droidspaces natively supports nested containerization (running Docker, Podman, o
 
 While namespace blocking is removed, legacy host kernels may still present challenges for modern nested tools:
 
-- **Deadlock Shield Trade-off**: If your specific device suffers from the 4.14.113 `grab_super()` VFS deadlock and requires the **Deadlock Shield** to boot systemd, enabling the shield will block the namespace syscalls required by Docker,LXC and Podman. You cannot use nested containers if the shield is active.
+- **Deadlock Shield Trade-off**: If your specific device suffers from the 4.14.113 `grab_super()` VFS deadlock and requires the **Deadlock Shield** to boot systemd, enabling the shield will block the namespace syscalls required by Docker, LXC, and Podman. You cannot use nested containers if the shield is active.
 - **Networking Incompatibilities**: Modern Docker/LXC/Podman rely on `nftables`. Legacy kernels often lack full `nftables` support. **Workaround:** Ensure you are using Droidspaces' **NAT mode**, and switch your container's alternatives configuration to use `iptables-legacy` and `ip6tables-legacy`.
 - **BPF Conflicts**: Modern Docker/runc versions use `BPF_CGROUP_DEVICE` for device management. Legacy kernels lack the required BPF attach types, leading to `Invalid argument` errors.
   - **Workaround:** Configure Docker to use the older `cgroupfs` driver and `vfs` storage driver.
