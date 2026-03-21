@@ -1,5 +1,8 @@
 # Cool Things You Can Do with Droidspaces
 
+> [!IMPORTANT]
+> This guide is specifically focused on **Android devices**. While Droidspaces also runs on Linux Desktop, these instructions address the unique networking, storage, and kernel requirements of the Android environment.
+
 ### Quick Navigation
 
 - [1. Setting Up a Secure "Mobile Server" (Tailscale + UFW + Fail2Ban)](#1-setting-up-a-secure-mobile-server-tailscale--ufw--fail2ban)
@@ -9,8 +12,18 @@
     - [Step 3: Set Up Tailscale](#step-3-set-up-tailscale)
     - [Step 4: Secure the Container with UFW (Firewall)](#step-4-secure-the-container-with-ufw-firewall)
     - [Step 5: Add Brute-Force Protection with Fail2Ban](#step-5-add-brute-force-protection-with-fail2ban)
+- [2. Running Docker Containers (Nested Containerization)](#2-running-docker-containers-nested-containerization)
+    - [Prerequisites](#prerequisites-1)
+    - [Step 1: Ensure NAT Networking](#step-1-ensure-nat-networking)
+    - [Step 2: Compatibility Layer (iptables-legacy)](#step-2-compatibility-layer-iptables-legacy)
+    - [Step 3: Install Docker](#step-3-install-docker)
+    - [Step 4: Non-Root User Setup](#step-4-non-root-user-setup)
+    - [Step 5: Verify Installation](#step-5-verify-installation)
+    - ["Last Resort" for Host Mode or Legacy Kernels (Old Kernels Only)](#last-resort-for-host-mode-or-legacy-kernels-old-kernels-only)
 
 ---
+
+## 1. Setting Up a Secure "Mobile Server" (Tailscale + UFW + Fail2Ban)
 
 You can turn your Android device into a secure, accessible-from-anywhere Linux server by combining Droidspaces with Tailscale and standard Linux security tools.
 
@@ -61,12 +74,12 @@ To maintain a secure server, creating a dedicated user with `sudo` privileges an
    passwd YOUR_USER
    ```
 
-2. **Install OpenSSH Server**:
+3. **Install OpenSSH Server**:
    ```bash
    apt install -y openssh-server
    ```
 
-3. **Disable Root Login**:
+4. **Disable Root Login**:
    Edit `/etc/ssh/sshd_config` to prevent direct root access:
    ```bash
    sed -i 's/#PermitRootLogin prohibit-password/PermitRootLogin no/' /etc/ssh/sshd_config
@@ -156,7 +169,96 @@ Fail2Ban monitors your system logs and automatically blocks IP addresses that sh
    systemctl restart fail2ban
    fail2ban-client status sshd
    ```
+Your "Mobile Server" is now officially a hardened fortress! Anyone attempting to access it from the open internet will be blocked, while you maintain full access through your private Tailscale network.
 
 ---
 
-Your "Mobile Server" is now officially a hardened fortress! Anyone attempting to access it from the open internet will be blocked, while you maintain full access through your private Tailscale network. 🗿✨
+## 2. Running Docker Containers (Nested Containerization)
+
+Droidspaces supports running Docker natively inside your containers on all supported kernel versions. This allows you to run nested containerized services (like Portainer, Home Assistant, etc.) directly on your Android device.
+
+### Prerequisites
+
+- **LTS Distribution**: If your kernel version is less than **5.x.x**, it is highly recommended to use an LTS distribution like **Ubuntu 24.04 LTS** for the best compatibility.
+- **Kernel Configuration**: Ensure your kernel has the required Droidspaces options enabled. See [Required Kernel Configuration](./Kernel-Configuration.md#required-kernel-configuration).
+- **Storage Mode**: You **must** use either **ext4 /data** or **rootfs.img mode** (recommended).
+    - *Why?* Android's default `f2fs` filesystem does not support the overlay features required by Docker's `overlay2` storage driver. Using a `rootfs.img` ensures you are running on a native ext4 filesystem.
+- **NAT Mode**: **Mandatory.** Docker requires NAT networking to create its internal `docker0` bridge and provide internet access to nested containers.
+
+---
+
+### Step 1: Ensure NAT Networking
+
+Running Droidspaces in host networking mode will cause Docker to fail when attempting to create the `docker0` interface. Always choose NAT mode for your container.
+
+You can easily change to the NAT mode by editing the container configuration using the Android app.
+
+### Step 2: Compatibility Layer (iptables-legacy)
+
+Docker relies heavily on `iptables` for its networking stack. Modern distributions often default to the `nftables` backend, which can cause "chain not found" errors in containers. Switch to the legacy backend before installing Docker:
+
+```bash
+update-alternatives --set iptables /usr/sbin/iptables-legacy
+update-alternatives --set ip6tables /usr/sbin/ip6tables-legacy
+```
+
+### Step 3: Install Docker
+
+Use the official Docker installation script or the distribution's package manager:
+
+```bash
+# Using the official convenience script
+curl -fsSL https://get.docker.com -o get-docker.sh
+sh get-docker.sh
+```
+
+### Step 4: Non-Root User Setup
+
+To run Docker commands without prefixing them with `sudo`, add your user to the `docker` group:
+
+```bash
+# Replace YOUR_USER with your username
+usermod -aG docker YOUR_USER
+
+# Apply the group change without logging out
+newgrp docker
+```
+
+### Step 5: Verify Installation
+
+Test that Docker can pull and run a nested container:
+
+```bash
+docker run --rm hello-world
+```
+
+If you see the "Hello from Docker!" message, you are successfully running nested containers on Android! 🐳
+
+> [!TIP]
+>
+> **Troubleshooting Docker**: If the Docker daemon fails to start automatically or the `docker run` command fails, run `sudo dockerd` manually in your terminal. This will output real-time logs and help you identify if there are any missing kernel modules, filesystem conflicts, or network bridge issues.
+
+### "Last Resort" for Host Mode or Legacy Kernels (Old Kernels Only)
+
+If you absolutely must run Docker in **host networking mode**, or if your kernel is too old to support `iptables-legacy` and NAT networking, you can disable Docker's internal networking management as a last resort.
+
+Run these commands to configure the daemon:
+
+```bash
+mkdir -p /etc/docker
+cat <<EOF > /etc/docker/daemon.json
+{
+  "iptables": false,
+  "ip6tables": false,
+  "bridge": "none"
+}
+EOF
+systemctl restart docker
+```
+> [!WARNING]
+>
+> Above `daemon.json` configuration disables Docker's internal bridge (`docker0`) and all automatic port forwarding. You will only be able to run docker containers with internet with the `--network host` flag.
+>
+> eg: `docker run -it --network host ubuntu`
+
+---

@@ -134,6 +134,7 @@ What makes Droidspaces unique is its **zero-dependency, native execution** on bo
     - [Linux Desktop](#b-linux-desktop)
 - [Installation](#installation)
 - [Usage](#usage)
+- [Cool Things You Can Do (Tailscale, Docker, etc.)](./Documentation/Cool-things-you-can-do.md)
 - [Additional Documentation](#additional-documentation)
 - [Credits](#credits)
 
