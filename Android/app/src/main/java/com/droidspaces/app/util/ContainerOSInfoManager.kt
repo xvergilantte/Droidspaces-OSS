@@ -30,7 +30,8 @@ object ContainerOSInfoManager {
         val versionId: String?,
         val id: String?,
         val hostname: String?,
-        val ipAddress: String?
+        val ipAddress: String?,
+        val uptime: String? = null
     )
 
     /**
@@ -110,7 +111,17 @@ object ContainerOSInfoManager {
                 null
             }
 
-            val finalInfo = osInfo.copy(hostname = hostname, ipAddress = ipAddress)
+            // Get Uptime
+            val uptimeCommand = ContainerCommandBuilder.buildUptimeCommand(containerName)
+            val uptimeResult = Shell.cmd(uptimeCommand).exec()
+
+            val uptimeValue = if (uptimeResult.isSuccess && uptimeResult.out.isNotEmpty()) {
+                uptimeResult.out.firstOrNull()?.trim()?.takeIf { it.isNotEmpty() && it != "NONE" }
+            } else {
+                null
+            }
+
+            val finalInfo = osInfo.copy(hostname = hostname, ipAddress = ipAddress, uptime = uptimeValue)
             // Cache the result (both in-memory and persistent)
             cache[containerName] = finalInfo
             val ctx = context
@@ -196,7 +207,7 @@ object ContainerOSInfoManager {
             }
         }
 
-        return OSInfo(prettyName, name, version, versionId, id, null, null)
+        return OSInfo(prettyName, name, version, versionId, id, null, null, null)
     }
 
     /**

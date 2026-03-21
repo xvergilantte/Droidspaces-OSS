@@ -19,7 +19,6 @@ object AndroidSystemStatsCollector {
     data class SystemUsage(
         val cpuPercent: Double = 0.0,
         val ramPercent: Double = 0.0,
-        val uptime: String = "0s",
         val temperature: String = "N/A"
     )
 
@@ -34,13 +33,11 @@ object AndroidSystemStatsCollector {
         try {
             val cpuPercent = getCpuUsage()
             val ramPercent = getRamUsage()
-            val uptime = getUptime()
             val temperature = getTemperature()
 
             SystemUsage(
                 cpuPercent = cpuPercent,
                 ramPercent = ramPercent,
-                uptime = uptime,
                 temperature = temperature
             )
         } catch (e: Exception) {
@@ -131,23 +128,6 @@ object AndroidSystemStatsCollector {
     }
 
     /**
-     * Get system uptime from Android /proc/uptime.
-     */
-    private suspend fun getUptime(): String = withContext(Dispatchers.IO) {
-        try {
-            val result = Shell.cmd("cat /proc/uptime").exec()
-
-            if (result.isSuccess && result.out.isNotEmpty()) {
-                val uptimeSeconds = result.out[0].trim().split("\\s+".toRegex())[0].toDoubleOrNull() ?: 0.0
-                return@withContext formatUptime(uptimeSeconds.toLong())
-            }
-        } catch (e: Exception) {
-            Log.e(TAG, "Error getting uptime", e)
-        }
-        "0s"
-    }
-
-    /**
      * Get CPU temperature from Android thermal sensors.
      */
     private suspend fun getTemperature(): String = withContext(Dispatchers.IO) {
@@ -175,21 +155,6 @@ object AndroidSystemStatsCollector {
         "N/A"
     }
 
-    /**
-     * Format uptime seconds to human-readable string.
-     */
-    private fun formatUptime(seconds: Long): String {
-        val days = seconds / 86400
-        val hours = (seconds % 86400) / 3600
-        val minutes = (seconds % 3600) / 60
-        val secs = seconds % 60
 
-        return when {
-            days > 0 -> String.format("%dd %dh", days, hours)
-            hours > 0 -> String.format("%dh %dm", hours, minutes)
-            minutes > 0 -> String.format("%dm %ds", minutes, secs)
-            else -> String.format("%ds", secs)
-        }
-    }
 }
 

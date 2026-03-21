@@ -29,7 +29,6 @@ import com.droidspaces.app.R
 fun SystemStatisticsCard(
     cpuPercent: Double = 0.0,
     ramPercent: Double = 0.0,
-    uptime: String = "0s",
     temperature: String = "N/A",
     onClick: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -113,30 +112,7 @@ fun SystemStatisticsCard(
                     )
                 }
 
-                // Uptime with label
-                Box(
-                    modifier = Modifier
-                        .weight(1f)
-                        .fillMaxHeight(),
-                    contentAlignment = Alignment.Center
-                ) {
-                    // Center-aligned text value
-                    Text(
-                        text = uptime,
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Medium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.9f)
-                    )
 
-                    // Label at 1% from bottom
-                    Text(
-                        text = context.getString(R.string.uptime),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f),
-                        modifier = Modifier.align(Alignment.BottomCenter)
-                            .padding(bottom = 1.dp) // 1% of 140.dp ≈ 1.dp
-                    )
-                }
 
                 // Temperature with label
                 Box(

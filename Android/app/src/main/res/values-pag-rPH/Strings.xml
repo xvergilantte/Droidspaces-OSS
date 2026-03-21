@@ -6,10 +6,8 @@
 
     <string name="root_check_title">Panang-chek na Root Access</string>
     <string name="checking_root">Tsek-tseken so root access…</string>
-    <string name="checking_root_access">Tsek-tseken so root access...</string>
     <string name="root_granted">Inabuloyan so Root Access</string>
     <string name="root_denied">Ag-inabuloyan so Root Access</string>
-    <string name="root_required">Kaukolan so root access parad sayan app</string>
     <string name="root_required_message">Kaukolan so root access pian naasikaso iray container.</string>
     <string name="check_root_access">I-chek so Root Access</string>
     <string name="check_root_access_click">I-klik ed leksab pian i-chek so root access</string>
@@ -193,7 +191,6 @@
     <string name="system_statistics">Estadistika na System</string>
     <string name="cpu">CPU</string>
     <string name="ram">RAM</string>
-    <string name="uptime">Uptime</string>
     <string name="temp">Temp</string>
 
     <string name="systemd_services">Saray Serbisyo na Systemd</string>

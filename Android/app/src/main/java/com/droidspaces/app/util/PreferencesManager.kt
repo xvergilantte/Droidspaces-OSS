@@ -153,7 +153,7 @@ class PreferencesManager private constructor(context: Context) {
      */
     fun saveContainerOSInfo(containerName: String, osInfo: ContainerOSInfoManager.OSInfo) {
         // Simple format: field1|field2|field3|... (pipe-separated)
-        // Order: prettyName|name|version|versionId|id|hostname|ipAddress
+        // Order: prettyName|name|version|versionId|id|hostname|ipAddress|uptime
         val data = listOf(
             osInfo.prettyName ?: "",
             osInfo.name ?: "",
@@ -161,7 +161,8 @@ class PreferencesManager private constructor(context: Context) {
             osInfo.versionId ?: "",
             osInfo.id ?: "",
             osInfo.hostname ?: "",
-            osInfo.ipAddress ?: ""
+            osInfo.ipAddress ?: "",
+            osInfo.uptime ?: ""
         ).joinToString("|")
         prefs.edit().putString("${KEY_CONTAINER_OS_INFO_PREFIX}$containerName", data).apply()
     }
@@ -174,7 +175,7 @@ class PreferencesManager private constructor(context: Context) {
         val data = prefs.getString("${KEY_CONTAINER_OS_INFO_PREFIX}$containerName", null) ?: return null
         return try {
             val parts = data.split("|")
-            if (parts.size != 7) return null // Invalid format
+            if (parts.size < 7) return null // Invalid format
 
             ContainerOSInfoManager.OSInfo(
                 prettyName = parts[0].takeIf { it.isNotEmpty() },
@@ -183,7 +184,8 @@ class PreferencesManager private constructor(context: Context) {
                 versionId = parts[3].takeIf { it.isNotEmpty() },
                 id = parts[4].takeIf { it.isNotEmpty() },
                 hostname = parts[5].takeIf { it.isNotEmpty() },
-                ipAddress = parts[6].takeIf { it.isNotEmpty() }
+                ipAddress = parts[6].takeIf { it.isNotEmpty() },
+                uptime = if (parts.size >= 8) parts[7].takeIf { it.isNotEmpty() } else null
             )
         } catch (e: Exception) {
             null

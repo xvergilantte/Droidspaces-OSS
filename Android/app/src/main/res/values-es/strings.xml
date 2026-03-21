@@ -6,10 +6,8 @@
 
     <string name="root_check_title">Verificar Acceso Root</string>
     <string name="checking_root">Verificando acceso root…</string>
-    <string name="checking_root_access">Verificando acceso root...</string>
     <string name="root_granted">Acceso Root Permitido</string>
     <string name="root_denied">Acceso Root Denegado</string>
-    <string name="root_required">Se requiere acceso root para esta app</string>
     <string name="root_required_message">Se requiere acceso root para administrar contenedores.</string>
     <string name="check_root_access">Verificar Acceso Root</string>
     <string name="check_root_access_click">Toca abajo para verificar el acceso root</string>
@@ -192,7 +190,6 @@
     <string name="system_statistics">Estadísticas del sistema</string>
     <string name="cpu">CPU</string>
     <string name="ram">RAM</string>
-    <string name="uptime">Tiempo activo</string>
     <string name="temp">Temp.</string>
 
     <string name="systemd_services">Servicios Systemd</string>

@@ -75,7 +75,6 @@ fun ControlPanelScreen(
                     SystemStatisticsCard(
                         cpuPercent = systemUsage.cpuPercent,
                         ramPercent = systemUsage.ramPercent,
-                        uptime = systemUsage.uptime,
                         temperature = systemUsage.temperature
                     )
 

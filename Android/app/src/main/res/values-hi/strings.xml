@@ -8,10 +8,8 @@
     <!-- Root Check Screen -->
     <string name="root_check_title">रूट एक्सेस जांच</string>
     <string name="checking_root">रूट एक्सेस की जांच की जा रही है…</string>
-    <string name="checking_root_access">रूट एक्सेस की जांच की जा रही है...</string>
     <string name="root_granted">रूट एक्सेस प्राप्त</string>
     <string name="root_denied">रूट एक्सेस अस्वीकृत</string>
-    <string name="root_required">इस ऐप के लिए रूट एक्सेस आवश्यक है</string>
     <string name="root_required_message">कंटेनरों को प्रबंधित करने के लिए रूट एक्सेस आवश्यक है।</string>
     <string name="check_root_access">रूट एक्सेस जांचें</string>
     <string name="check_root_access_click">रूट एक्सेस जांचने के लिए नीचे क्लिक करें</string>
@@ -207,7 +205,6 @@
     <string name="system_statistics">सिस्टम आँकड़े</string>
     <string name="cpu">CPU</string>
     <string name="ram">RAM</string>
-    <string name="uptime">अपटाइम</string>
     <string name="temp">तापमान</string>
 
     <!-- Systemd Screen -->

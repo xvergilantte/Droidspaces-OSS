@@ -174,7 +174,8 @@ private fun hasOSInfoChanged(old: ContainerOSInfoManager.OSInfo, new: ContainerO
            old.versionId != new.versionId ||
            old.id != new.id ||
            old.hostname != new.hostname ||
-           old.ipAddress != new.ipAddress
+           old.ipAddress != new.ipAddress ||
+           old.uptime != new.uptime
 }
 
 /**
@@ -254,7 +255,12 @@ private fun ContainerInfoCard(
                         InfoRow(label = context.getString(R.string.version), value = it)
                                 }
 
-                                // Hostname
+                                // Container Uptime
+                                        currentInfo.uptime?.let {
+                        InfoRow(label = context.getString(R.string.uptime), value = it)
+                                    }
+
+                                    // Hostname
                                         currentInfo.hostname?.let {
                         InfoRow(label = context.getString(R.string.hostname), value = it)
                                     }

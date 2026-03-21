@@ -6,10 +6,8 @@
 
     <string name="root_check_title">Pagsusuri ng Root Access</string>
     <string name="checking_root">Sinusuri ang root access…</string>
-    <string name="checking_root_access">Sinusuri ang root access...</string>
     <string name="root_granted">Pinahintulutan ang Root Access</string>
     <string name="root_denied">Tinanggihan ang Root Access</string>
-    <string name="root_required">Kailangan ang root access para sa app na ito</string>
     <string name="root_required_message">Kailangan ang root access upang pamahalaan ang mga container.</string>
     <string name="check_root_access">Suriin ang Root Access</string>
     <string name="check_root_access_click">I-click sa ibaba upang suriin ang root access</string>
@@ -193,7 +191,6 @@
     <string name="system_statistics">Estadistika ng System</string>
     <string name="cpu">CPU</string>
     <string name="ram">RAM</string>
-    <string name="uptime">Uptime</string>
     <string name="temp">Temp</string>
 
     <string name="systemd_services">Mga Serbisyo ng Systemd</string>

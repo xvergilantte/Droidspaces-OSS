@@ -144,7 +144,7 @@ fun RootCheckScreen(
                                 isChecking || currentRootStatus == RootStatus.Checking -> {
                                     LoadingIndicator(size = LoadingSize.Large)
                                     Text(
-                                        text = context.getString(R.string.checking_root_access),
+                                        text = context.getString(R.string.checking_root),
                                         style = MaterialTheme.typography.bodyMedium,
                                         textAlign = TextAlign.Center
                                     )

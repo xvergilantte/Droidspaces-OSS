@@ -8,10 +8,8 @@
     <!-- Root Check Screen -->
     <string name="root_check_title">Vérification de l\'accès root</string>
     <string name="checking_root">Vérification de l\'accès root…</string>
-    <string name="checking_root_access">Vérification de l\'accès root...</string>
     <string name="root_granted">Accès root accordé</string>
     <string name="root_denied">Accès root refusé</string>
-    <string name="root_required">L\'accès root est requis pour cette application</string>
     <string name="root_required_message">L\'accès root est requis pour gérer les conteneurs.</string>
     <string name="check_root_access">Vérifier l\'accès root</string>
     <string name="check_root_access_click">Cliquez ci-dessous pour vérifier l\'accès root</string>
@@ -207,7 +205,6 @@
     <string name="system_statistics">Statistiques système</string>
     <string name="cpu">CPU</string>
     <string name="ram">RAM</string>
-    <string name="uptime">Uptime</string>
     <string name="temp">Temp</string>
 
     <!-- Systemd Screen -->

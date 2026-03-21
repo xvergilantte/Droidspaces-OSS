@@ -11,10 +11,8 @@
     <!-- Root Check Screen -->
     <string name="root_check_title">Root-Zugangsprüfung</string>
     <string name="checking_root">Überprüfe Root-Zugriff…</string>
-    <string name="checking_root_access">Überprüfe Root-Zugriff...</string>
     <string name="root_granted">Root-Zugriff gewährt</string>
     <string name="root_denied">Root-Zugriff verweigert</string>
-    <string name="root_required">Für diese App ist Root-Zugriff erforderlich</string>
     <string name="root_required_message">Root-Zugriff wird benötigt, um Container zu verwalten.</string>
     <string name="check_root_access">Root-Zugriff prüfen</string>
     <string name="check_root_access_click">Unten klicken, um Root-Zugriff zu prüfen</string>
@@ -210,7 +208,6 @@
     <string name="system_statistics">System-Statistiken</string>
     <string name="cpu">CPU</string>
     <string name="ram">RAM</string>
-    <string name="uptime">Laufzeit</string>
     <string name="temp">Temp</string>
 
     <!-- Systemd Screen -->

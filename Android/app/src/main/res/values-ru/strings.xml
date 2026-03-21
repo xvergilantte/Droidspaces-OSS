@@ -8,10 +8,8 @@
     <!-- Root Check Screen -->
     <string name="root_check_title">Проверка Root-доступа</string>
     <string name="checking_root">Проверка Root-доступа…</string>
-    <string name="checking_root_access">Проверка Root-доступа…</string>
     <string name="root_granted">Root-доступ предоставлен</string>
     <string name="root_denied">Root-доступ отклонён</string>
-    <string name="root_required">Для этого приложения требуется Root-доступ</string>
     <string name="root_required_message">Root-доступ необходим для управления контейнерами.</string>
     <string name="check_root_access">Проверить Root-доступ</string>
     <string name="check_root_access_click">Нажмите ниже, чтобы проверить Root-доступ</string>
@@ -207,7 +205,6 @@
     <string name="system_statistics">Статистика системы</string>
     <string name="cpu">CPU</string>
     <string name="ram">RAM</string>
-    <string name="uptime">Время работы</string>
     <string name="temp">Температура</string>
 
     <!-- Systemd Screen -->
