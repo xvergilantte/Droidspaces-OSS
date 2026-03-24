@@ -529,26 +529,35 @@ int ds_metadata_sync(pid_t pid) {
 
   /* 3. Restore Configuration */
   struct ds_config recovery_cfg = {0};
+  char pidfile[PATH_MAX];
+  resolve_pidfile_from_name(safe_name, pidfile, sizeof(pidfile));
+
   build_proc_root_path(pid, "/run/droidspaces/container.config", path,
                        sizeof(path));
+
   if (ds_config_load(path, &recovery_cfg) == 0) {
-    /* Use precision to satisfy compiler about potential truncation */
     snprintf(recovery_cfg.config_file, sizeof(recovery_cfg.config_file),
              "%.3800s/container.config", container_dir);
-    if (ds_config_save(recovery_cfg.config_file, &recovery_cfg) < 0) {
-      ds_warn("Recovery: Failed to persist configuration for PID %d", pid);
+
+    if (access(recovery_cfg.config_file, F_OK) != 0) {
+      if (ds_config_save(recovery_cfg.config_file, &recovery_cfg) < 0) {
+        ds_warn("Recovery: Failed to persist configuration for PID %d", pid);
+      } else {
+        ds_log("Recovery: Restored missing configuration for container '%s'",
+               safe_name);
+      }
     }
   }
 
   /* 4. Restore PID Sidecar */
-  char pidfile[PATH_MAX];
-  resolve_pidfile_from_name(safe_name, pidfile, sizeof(pidfile));
-  char pid_str[32];
-  snprintf(pid_str, sizeof(pid_str), "%d", pid);
-  write_file_atomic(pidfile, pid_str);
+  if (access(pidfile, F_OK) != 0) {
+    char pid_str[32];
+    snprintf(pid_str, sizeof(pid_str), "%d", pid);
+    write_file_atomic(pidfile, pid_str);
+  }
 
   /* 5. Restore ENV Sidecar */
-  if (recovery_cfg.env_file[0]) {
+  if (recovery_cfg.env_file[0] && access(recovery_cfg.env_file, F_OK) != 0) {
     build_proc_root_path(pid, "/run/droidspaces.env", path, sizeof(path));
     if (access(path, F_OK) == 0) {
       write_plain_env_file(path, recovery_cfg.env_file);
@@ -556,10 +565,13 @@ int ds_metadata_sync(pid_t pid) {
   }
 
   /* 6. Restore MOUNT Sidecar */
-  build_proc_root_path(pid, "/run/droidspaces/mount", path, sizeof(path));
-  if (read_file(path, mount, sizeof(mount)) >= 0) {
-    mount[strcspn(mount, "\n")] = '\0';
-    save_mount_path(pidfile, mount);
+  char mpath[PATH_MAX];
+  if (read_mount_path(pidfile, mpath, sizeof(mpath)) < 0) {
+    build_proc_root_path(pid, "/run/droidspaces/mount", path, sizeof(path));
+    if (read_file(path, mount, sizeof(mount)) >= 0) {
+      mount[strcspn(mount, "\n")] = '\0';
+      save_mount_path(pidfile, mount);
+    }
   }
 
   free_config_binds(&recovery_cfg);
