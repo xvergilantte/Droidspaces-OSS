@@ -1,0 +1,44 @@
+;; Define Types
+(type droidspacesd)
+(typeattribute base_typeattr_31_0 droidspacesd)
+(typeattribute domain droidspacesd)
+(typepermissive droidspacesd) ;; Recommended for initial development
+
+(type droidspacesd_exec)
+(typeattribute exec_type droidspacesd_exec)
+(typeattribute file_type droidspacesd_exec)
+(typeattribute system_file_type droidspacesd_exec)
+
+(type droidspaces_data_file)
+(typeattribute file_type droidspaces_data_file)
+(typeattribute data_file_type droidspaces_data_file)
+(typeattribute core_data_file_type droidspaces_data_file)
+
+;; Domain Transition (init -> droidspacesd)
+(typetransition init droidspacesd_exec process droidspacesd)
+(allow init droidspacesd (process (transition noatsecure rlimitinh siginh)))
+(allow droidspacesd droidspacesd (process (getsched rlimitinh siginh)))
+(allow droidspacesd droidspacesd_exec (file (entrypoint read execute getattr open map)))
+(allow init droidspacesd_exec (file (read getattr open execute map)))
+
+;; Core Capabilities
+(allow droidspacesd self (capability (sys_admin net_admin chown fowner fsetid setgid setuid sys_chroot sys_ptrace mknod)))
+(allow droidspacesd self (process (setexec setfscreate setpgid setsched)))
+
+;; Networking (Abstract Sockets & Route Monitor)
+(allow droidspacesd self (unix_stream_socket (create_stream_socket_perms)))
+(allow droidspacesd self (netlink_route_socket (create_socket_perms_no_ioctl nlmsg_read nlmsg_write)))
+
+;; Storage & Mounting
+(allow droidspacesd loop_device (blk_file (read write open ioctl)))
+(allow droidspacesd device (dir (write add_name remove_name)))
+(allow droidspacesd labeledfs (filesystem (mount unmount)))
+
+;; Data Access
+(allow droidspacesd droidspaces_data_file (dir (create_dir_perms)))
+(allow droidspacesd droidspaces_data_file (file (create_file_perms)))
+(allow droidspacesd vold_data_file (dir (create_dir_perms)))
+(allow droidspacesd vold_data_file (file (create_file_perms)))
+
+;; Abstract Socket Security (Client Connection)
+;; (allow <client_domain> droidspacesd (unix_stream_socket (connectto)))
