@@ -1,7 +1,0 @@
-# UNTESTED - WILL CLEAN THIS MESS AND UPDATE ONCE I GOT SOME FREE TIME
-
-service droidspacesd /data/local/Droidspaces/bin/droidspaces daemon --foreground
-    class late_start
-    user root
-    group root
-    seclabel u:r:droidspacesd:s0
