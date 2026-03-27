@@ -1,10 +1,18 @@
-# silences droidspaces and container process ioctl denials
+# silences droidspaces and container process ioctl denials (su domain - KernelSU direct)
 allow su su { unix_dgram_socket unix_stream_socket udp_socket } *
 allowxperm su su { unix_dgram_socket unix_stream_socket udp_socket } ioctl *
+
+# silences droidspaces and container process ioctl denials (magisk domain - Magisk/APatch)
+allow magisk magisk { unix_dgram_socket unix_stream_socket udp_socket } *
+allowxperm magisk magisk { unix_dgram_socket unix_stream_socket udp_socket } ioctl *
 
 # allows su domain to interact with the container rootfs (which Android sees as unlabeled)
 allow su unlabeled { dir file lnk_file sock_file fifo_file } *
 allowxperm su unlabeled { dir file lnk_file sock_file fifo_file } ioctl *
+
+# allows magisk domain to interact with the container rootfs (which Android sees as unlabeled)
+allow magisk unlabeled { dir file lnk_file sock_file fifo_file } *
+allowxperm magisk unlabeled { dir file lnk_file sock_file fifo_file } ioctl *
 
 # allows kernel (kdevtmpfs) to create loop device nodes
 # also, allow kernel full access to rootfs image and vold data files
