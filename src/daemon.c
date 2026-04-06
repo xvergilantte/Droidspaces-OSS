@@ -933,7 +933,7 @@ static void client_sigwinch_handler(int sig) {
 
 int ds_client_run(int argc, char **argv) {
   if (argc < 1)
-    return 1;
+    return -2;
 
   int interactive = 0;
   for (int i = 0; i < argc; i++) {

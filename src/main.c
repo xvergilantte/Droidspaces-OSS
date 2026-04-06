@@ -868,11 +868,7 @@ int main(int argc, char **argv) {
     }
 
     case '?':
-      /* Ignore unknown options during override if we already found a cmd */
-      if (discovered_cmd)
-        break;
-      ret = 1;
-      goto cleanup;
+      break;
     default:
       break;
     }
