@@ -128,6 +128,7 @@ What makes Droidspaces unique is its **zero-dependency, native execution** on bo
 - [Requirements](#requirements)
     - [Android](#a-android-devices)
         - [Rooting Requirements](#rooting-requirements)
+        - [Known Quirks](#known-quirks)
         - [Android Kernel Requirements](#android-kernel-requirements)
             - [Non-GKI (Legacy Kernels)](#non-GKI)
             - [GKI (Modern Kernels)](#GKI)
@@ -255,6 +256,8 @@ Your device must be rooted. The following rooting methods have been tested:
 > [!TIP]
 >
 > Daemon Mode moves the container lifecycle management from the app's userspace to a persistent background service.
+
+<a id="known-quirks"></a>
 
 > [!CAUTION]
 >
