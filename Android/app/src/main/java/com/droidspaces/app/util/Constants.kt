@@ -18,6 +18,10 @@ object Constants {
 
     // Container paths
     const val CONTAINERS_BASE_PATH = "/data/local/Droidspaces/Containers"
+    const val MODULE_SYSTEM_BIN_PATH = "$MAGISK_MODULE_PATH/system/bin"
+    const val SYSTEM_BIN_SYMLINK_PATH = "$MODULE_SYSTEM_BIN_PATH/$DROIDSPACES_BINARY_NAME"
+    const val KEY_SYMLINK_ENABLED = "symlink_enabled"
+
     const val DAEMON_MODE_FILE = "/data/local/Droidspaces/.daemon_mode"
     const val DAEMON_PID_FILE = "/data/local/Droidspaces/droidspacesd.pid"
     const val CONTAINER_CONFIG_FILE = "container.config"

@@ -47,10 +47,13 @@ import com.droidspaces.app.util.PreferencesManager
 import com.droidspaces.app.util.LocaleHelper
 import com.droidspaces.app.util.ContributorManager
 import com.droidspaces.app.util.Contributor
+import com.droidspaces.app.util.SymlinkInstaller
 import androidx.core.content.edit
 import java.util.Locale
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import androidx.compose.runtime.rememberCoroutineScope
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,6 +67,7 @@ fun SettingsScreen(
     val prefsManager = remember { PreferencesManager.getInstance(context) }
     val appStateViewModel: AppStateViewModel = viewModel()
     val isRootAvailable = appStateViewModel.isRootAvailable
+    val scope = rememberCoroutineScope()
 
     // Theme state - use reactive theme state holder for instant updates
     // This eliminates redundant preference reads on every recomposition
@@ -89,11 +93,15 @@ fun SettingsScreen(
     // Daemon mode state
     var isDaemonModeEnabled by remember { mutableStateOf(prefsManager.isDaemonModeEnabled) }
 
+    // Symlink state
+    var isSymlinkEnabled by remember { mutableStateOf(prefsManager.isSymlinkEnabled) }
+
     // Register SharedPreferences listener for daemon mode
     DisposableEffect(prefsManager) {
         val listener = SharedPreferences.OnSharedPreferenceChangeListener { _: SharedPreferences, key: String? ->
-            if (key == PreferencesManager.KEY_DAEMON_MODE_ENABLED) {
-                isDaemonModeEnabled = prefsManager.isDaemonModeEnabled
+            when (key) {
+                PreferencesManager.KEY_DAEMON_MODE_ENABLED -> isDaemonModeEnabled = prefsManager.isDaemonModeEnabled
+                PreferencesManager.KEY_SYMLINK_ENABLED -> isSymlinkEnabled = prefsManager.isSymlinkEnabled
             }
         }
         prefsManager.prefs.registerOnSharedPreferenceChangeListener(listener)
@@ -107,6 +115,7 @@ fun SettingsScreen(
         currentAppLocale = LocaleHelper.getCurrentAppLocale(context)
         withContext(Dispatchers.IO) {
             prefsManager.syncDaemonModeFromDisk()
+            prefsManager.syncSymlinkFromDisk()
         }
     }
 
@@ -207,6 +216,25 @@ fun SettingsScreen(
                 enabled = isRootAvailable,
                 onCheckedChange = { checked ->
                     prefsManager.isDaemonModeEnabled = checked
+                }
+            )
+
+            val isBackendAvailable = appStateViewModel.isBackendAvailable
+            SwitchItem(
+                icon = Icons.Default.Link,
+                title = context.getString(R.string.symlink_integration),
+                summary = context.getString(R.string.symlink_integration_description),
+                checked = isSymlinkEnabled,
+                enabled = isBackendAvailable,
+                onCheckedChange = { checked ->
+                    scope.launch {
+                        val ok = withContext(Dispatchers.IO) {
+                            if (checked) SymlinkInstaller.enable() else SymlinkInstaller.disable()
+                        }
+                        if (ok) {
+                            prefsManager.isSymlinkEnabled = checked
+                        }
+                    }
                 }
             )
 

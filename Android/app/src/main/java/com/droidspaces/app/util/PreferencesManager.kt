@@ -139,6 +139,12 @@ class PreferencesManager private constructor(context: Context) {
             syncDaemonMode(value)
         }
 
+    var isSymlinkEnabled: Boolean
+        get() = prefs.getBoolean(KEY_SYMLINK_ENABLED, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_SYMLINK_ENABLED, value).apply()
+        }
+
     /**
      * Sync daemon mode preference to the root-protected file on disk.
      * writes 1 if enabled, 0 if disabled.
@@ -166,6 +172,14 @@ class PreferencesManager private constructor(context: Context) {
                 // This will trigger the OnSharedPreferenceChangeListener in the UI
                 prefs.edit().putBoolean(KEY_DAEMON_MODE_ENABLED, enabled).apply()
             }
+        }
+    }
+
+    /** Syncs symlink pref from actual filesystem state. */
+    fun syncSymlinkFromDisk() {
+        val actual = SymlinkInstaller.isSymlinkEnabled()
+        if (isSymlinkEnabled != actual) {
+            prefs.edit().putBoolean(KEY_SYMLINK_ENABLED, actual).apply()
         }
     }
 
@@ -270,6 +284,7 @@ class PreferencesManager private constructor(context: Context) {
         private const val KEY_USE_DYNAMIC_COLOR = Constants.KEY_USE_DYNAMIC_COLOR
         const val KEY_THEME_PALETTE = Constants.KEY_THEME_PALETTE
         const val KEY_DAEMON_MODE_ENABLED = Constants.KEY_DAEMON_MODE_ENABLED
+        const val KEY_SYMLINK_ENABLED = Constants.KEY_SYMLINK_ENABLED
         const val KEY_CONTAINER_LOG_PREFIX = Constants.KEY_CONTAINER_LOG_PREFIX
         private const val KEY_CONTAINER_OS_INFO_PREFIX = Constants.KEY_CONTAINER_OS_INFO_PREFIX
 
