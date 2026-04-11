@@ -55,8 +55,17 @@ void ds_env_boot_setup(struct ds_config *cfg) {
   /* Capture TERM before clearenv() */
   const char *saved_term = getenv("TERM");
   char term_buf[64] = "xterm-256color";
-  if (saved_term)
-    safe_strncpy(term_buf, saved_term, sizeof(term_buf));
+
+  if (saved_term && saved_term[0]) {
+    /* Bug fix: TWRP terminal leaks internal variables like 'bg1.25' as TERM.
+     * Some recovery environments/kernels also set TERM to version strings.
+     * If it contains dots or appears to be a garbage value, use the default. */
+    if (strchr(saved_term, '.') || strncmp(saved_term, "bg", 2) == 0) {
+      /* likely garbage - keep default xterm-256color */
+    } else {
+      safe_strncpy(term_buf, saved_term, sizeof(term_buf));
+    }
+  }
 
   clearenv();
   set_container_defaults(term_buf);
