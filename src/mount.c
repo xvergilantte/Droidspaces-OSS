@@ -237,7 +237,12 @@ int bind_mount(const char *src, const char *tgt) {
  * In Hardware Mode (hw_access=1), we preserve most paths to fulfill the
  * "everything possible" requirement for low-level hardware tools.
  */
-int ds_apply_jail_mask(int hw_access) {
+int ds_apply_jail_mask(int hw_access, int privileged_mask) {
+  if (privileged_mask & DS_PRIV_NOMASK) {
+    ds_log(
+        "[SEC] --privileged=nomask: skipping jail masks for /proc and /sys.");
+    return 0;
+  }
   /* Initialize the shared mask-dir before anything uses it */
   ds_mask_dir_init();
 
@@ -404,7 +409,11 @@ int ds_apply_jail_mask(int hw_access) {
  * Scans the mounted /dev (devtmpfs) and unlinks dangerous nodes to isolate
  * the container from the host's display server, consoles, and GPU masters.
  */
-static void prune_host_devices(const char *dev_path) {
+static void prune_host_devices(const char *dev_path, int privileged_mask) {
+  if (privileged_mask & DS_PRIV_UNFILTERED) {
+    ds_log("[SEC] --privileged=unfiltered-dev: skipping hardware blocklist.");
+    return;
+  }
   DIR *dir = opendir(dev_path);
   if (!dir)
     return;
@@ -478,7 +487,8 @@ static void prune_host_devices(const char *dev_path) {
  * /dev setup
  * ---------------------------------------------------------------------------*/
 
-int setup_dev(const char *rootfs, int hw_access, int gpu_mode) {
+int setup_dev(const char *rootfs, int hw_access, int gpu_mode,
+              int privileged_mask) {
   char dev_path[PATH_MAX];
   snprintf(dev_path, sizeof(dev_path), "%s/dev", rootfs);
 
@@ -494,7 +504,7 @@ int setup_dev(const char *rootfs, int hw_access, int gpu_mode) {
        * We MUST immediately recreate them in create_devices() as REAL
        * character devices to prevent host breakage. This also performs
        * DRM master and host display isolation. */
-      prune_host_devices(dev_path);
+      prune_host_devices(dev_path, privileged_mask);
 
       /* devtmpfs is the kernel's own instance and does NOT contain nodes
        * that Android's ueventd created in its tmpfs-based /dev (kgsl-3d0,
@@ -528,7 +538,7 @@ int setup_dev(const char *rootfs, int hw_access, int gpu_mode) {
   }
 
   /* Create minimal set of device nodes (creates secure console/ptmx/etc.) */
-  int ret = create_devices(rootfs, hw_access);
+  int ret = create_devices(rootfs, hw_access, privileged_mask);
   if (ret < 0)
     return ret;
 
@@ -576,7 +586,7 @@ int setup_dev(const char *rootfs, int hw_access, int gpu_mode) {
   return ret;
 }
 
-int create_devices(const char *rootfs, int hw_access) {
+int create_devices(const char *rootfs, int hw_access, int privileged_mask) {
   (void)hw_access;
   const struct {
     const char *name;
@@ -597,8 +607,14 @@ int create_devices(const char *rootfs, int hw_access) {
   /* 1. Create standard devices */
   for (int i = 0; devices[i].name; i++) {
     snprintf(path, sizeof(path), "%s/dev/%s", rootfs, devices[i].name);
-    force_unlink(
-        path); /* Always start fresh to ensure correct type/permissions */
+
+    /* If unfiltered mode is on and the node already exists (e.g. on devtmpfs),
+     * we skip unlinking to avoid breaking the kernel-provided node. */
+    if (!(privileged_mask & DS_PRIV_UNFILTERED)) {
+      force_unlink(path);
+    } else if (access(path, F_OK) == 0) {
+      continue;
+    }
 
     if (mknod(path, devices[i].mode, devices[i].dev) < 0) {
       /* Fallback for environments where mknod is restricted */

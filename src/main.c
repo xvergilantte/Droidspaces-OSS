@@ -78,7 +78,9 @@ void print_usage(void) {
       "      --force-cgroupv1      Force legacy cgroup v1 hierarchy\n"
       "      --block-nested-namespaces\n"
       "                            Manual Deadlock Shield (no nested "
-      "namespaces)\n\n"
+      "namespaces)\n"
+      "      --privileged=TAGS     Relax security: nomask, nocaps, noseccomp, "
+      "shared, unfiltered-dev, full\n\n"
 
       C_BOLD "Options (Advanced):" C_RESET "\n"
       "  -f, --foreground          Run in foreground (attach console)\n"
@@ -339,6 +341,7 @@ int main(int argc, char **argv) {
       {"upstream", required_argument, 0, 259},
       {"force-cgroupv1", no_argument, 0, 260},
       {"block-nested-namespaces", no_argument, 0, 261},
+      {"privileged", required_argument, 0, 264},
       {"nat-ip", required_argument, 0, 262},
       {"gpu", no_argument, 0, 263},
       {"reset", no_argument, 0, 256},
@@ -613,6 +616,9 @@ int main(int argc, char **argv) {
       }
       cfg.net_mode = cli_net_mode;
       cli_net_mode_set = 1;
+      break;
+    case 264:
+      parse_privileged(optarg, &cfg);
       break;
 
     case 258: {
@@ -985,6 +991,14 @@ int main(int argc, char **argv) {
     enforce_nat_safety(&cfg, argc, argv);
 
     print_ds_banner();
+
+    print_privileged_warning(cfg.privileged_mask);
+
+    if ((cfg.privileged_mask & DS_PRIV_NOSEC) && cfg.block_nested_ns) {
+      ds_warn("--privileged=noseccomp is active: --block-nested-namespaces "
+              "is now a NO-OP.");
+    }
+
     print_cgroup_status(&cfg);
     check_kernel_recommendation();
     if (cfg.container_name[0] == '\0' && cfg.rootfs_path[0]) {
@@ -1007,6 +1021,14 @@ int main(int argc, char **argv) {
     }
     enforce_nat_safety(&cfg, argc, argv);
     print_ds_banner();
+
+    print_privileged_warning(cfg.privileged_mask);
+
+    if ((cfg.privileged_mask & DS_PRIV_NOSEC) && cfg.block_nested_ns) {
+      ds_warn("--privileged=noseccomp is active: --block-nested-namespaces "
+              "is now a NO-OP.");
+    }
+
     print_cgroup_status(&cfg);
     ret = restart_rootfs(&cfg);
     goto cleanup;

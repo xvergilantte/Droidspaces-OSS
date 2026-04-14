@@ -253,6 +253,18 @@ struct ds_port_forward {
   char proto[4];               /* "tcp" or "udp"                  */
 };
 
+/* ---------------------------------------------------------------------------
+ * Privileged Mode Flags
+ * ---------------------------------------------------------------------------*/
+#define DS_PRIV_NOMASK (1 << 0) /* No jail masks (/proc, /sys) */
+#define DS_PRIV_NOCAPS (1 << 1) /* No capability drops */
+#define DS_PRIV_NOSEC (1 << 2)  /* Minimal seccomp only */
+#define DS_PRIV_SHARED (1 << 3) /* MS_SHARED root propagation */
+#define DS_PRIV_UNFILTERED                                                     \
+  (1 << 4)                  /* No device node blocking (except PTYs)           \
+                             */
+#define DS_PRIV_FULL (0xFF) /* All above */
+
 struct ds_config {
   /* Paths */
   char rootfs_path[PATH_MAX];     /* --rootfs=  */
@@ -280,7 +292,8 @@ struct ds_config {
   int reboot_cycle;       /* 1 if we are in a reboot loop */
   int force_cgroupv1;     /* --force-cgroupv1: use v1 even if v2 is available */
   int block_nested_ns;    /* --block-nested-namespaces: fix VFS deadlock by
-                              blocking nested namespace creation */
+                               blocking nested namespace creation */
+  int privileged_mask;    /* --privileged bitmask */
   char prog_name[64];     /* argv[0] for logging */
 
   /* Runtime state */
@@ -376,6 +389,7 @@ int set_selinux_context(const char *path, const char *context);
 int ds_send_fd(int sock, int fd);
 int ds_recv_fd(int sock);
 void print_ds_banner(void);
+void print_privileged_warning(int privileged_mask);
 int is_systemd_rootfs(const char *path);
 int get_user_shell(const char *user, char *shell_buf, size_t size);
 void check_kernel_recommendation(void);
@@ -401,6 +415,7 @@ void free_config_unknown_lines(struct ds_config *cfg);
 char *ds_config_auto_path(const char *rootfs_path);
 void apply_reset_config(struct ds_config *cfg, int cli_net_mode_set,
                         enum ds_net_mode cli_net_mode);
+void parse_privileged(const char *value, struct ds_config *cfg);
 
 /* ---------------------------------------------------------------------------
  * android.c
@@ -413,7 +428,7 @@ int ds_get_selinux_status(void);
 void android_remount_data_suid(void);
 int android_setup_storage(const char *rootfs_path);
 int android_seccomp_setup(int is_systemd, int block_nested_ns);
-int ds_seccomp_apply_minimal(int hw_access);
+int ds_seccomp_apply_minimal(int hw_access, int privileged_mask);
 
 /* ---------------------------------------------------------------------------
  * mount.c
@@ -424,9 +439,10 @@ int domount(const char *src, const char *tgt, const char *fstype,
 int domount_silent(const char *src, const char *tgt, const char *fstype,
                    unsigned long flags, const char *data);
 int bind_mount(const char *src, const char *tgt);
-int ds_apply_jail_mask(int hw_access);
-int setup_dev(const char *rootfs, int hw_access, int gpu_mode);
-int create_devices(const char *rootfs, int hw_access);
+int ds_apply_jail_mask(int hw_access, int privileged_mask);
+int setup_dev(const char *rootfs, int hw_access, int gpu_mode,
+              int privileged_mask);
+int create_devices(const char *rootfs, int hw_access, int privileged_mask);
 int setup_devpts(int hw_access);
 int ds_fix_host_ptys(void);
 int setup_volatile_overlay(struct ds_config *cfg);
@@ -646,7 +662,7 @@ void write_plain_env_file(const char *src, const char *dst);
  * boot.c
  * ---------------------------------------------------------------------------*/
 
-void ds_apply_capability_hardening(int hw_access);
+void ds_apply_capability_hardening(int hw_access, int privileged_mask);
 int internal_boot(struct ds_config *cfg);
 
 /* ---------------------------------------------------------------------------

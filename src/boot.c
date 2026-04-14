@@ -19,7 +19,11 @@
  * In Hardware Mode (hw_access=1), we preserve most to ensure full
  * low-level hardware access (USB, Serial, Bluetooth, Flashing).
  */
-void ds_apply_capability_hardening(int hw_access) {
+void ds_apply_capability_hardening(int hw_access, int privileged_mask) {
+  if (privileged_mask & DS_PRIV_NOCAPS) {
+    ds_log("[SEC] --privileged=nocaps: skipping capability drops.");
+    return;
+  }
   /* Universal drops - even in hardware mode, there's no legitimate use
    * for CAP_SYS_MODULE inside a container (kernel module loading).
    * CAP_SYS_BOOT is intentionally preserved - it is required for in-container
@@ -174,7 +178,10 @@ int internal_boot(struct ds_config *cfg) {
     return -1;
   }
 
-  /* 2. Make all mounts private to avoid leaking to host */
+  /* 2. Make all mounts private to avoid leaking to host.
+   * We ALWAYS start with MS_PRIVATE because MS_SHARED breaks pivot_root/MS_MOVE
+   * fallbacks on some kernels (e.g. Android rootfs). We will switch to
+   * MS_SHARED after the rootfs relocation if requested. */
   if (mount(NULL, "/", NULL, MS_REC | MS_PRIVATE, NULL) < 0) {
     ds_error("Failed to make / private: %s", strerror(errno));
     return -1;
@@ -186,8 +193,10 @@ int internal_boot(struct ds_config *cfg) {
   /* Apply Seccomp filters early for host protection.
    * Minimal blocks kexec/module loading for all kernels/modes.
    * Android setup handles keyring compat and manual deadlock shield. */
-  ds_seccomp_apply_minimal(cfg->hw_access);
-  android_seccomp_setup(is_systemd, cfg->block_nested_ns);
+  ds_seccomp_apply_minimal(cfg->hw_access, cfg->privileged_mask);
+  android_seccomp_setup(is_systemd,
+                        cfg->block_nested_ns &&
+                            !(cfg->privileged_mask & DS_PRIV_NOSEC));
 
   /* 3. Setup volatile overlay INSIDE the container's mount namespace.
    * This MUST happen here (not in parent) so the overlay's connection to
@@ -242,7 +251,7 @@ int internal_boot(struct ds_config *cfg) {
   }
 
   /* 8. Setup /dev (device nodes, devtmpfs) */
-  if (setup_dev(".", cfg->hw_access, cfg->gpu_mode) < 0) {
+  if (setup_dev(".", cfg->hw_access, cfg->gpu_mode, cfg->privileged_mask) < 0) {
     ds_error("Failed to setup /dev.");
     return -1;
   }
@@ -435,11 +444,22 @@ int internal_boot(struct ds_config *cfg) {
     return -1;
   }
 
+  /* 17b. Apply deferred mount propagation settings.
+   * Switch to MS_SHARED only after relocation is complete. */
+  if (cfg->privileged_mask & DS_PRIV_SHARED) {
+    if (mount(NULL, "/", NULL, MS_REC | MS_SHARED, NULL) < 0) {
+      ds_warn("[SEC] Failed to apply MS_SHARED propagation: %s",
+              strerror(errno));
+    } else {
+      ds_log("[SEC] Root mount propagation set to SHARED.");
+    }
+  }
+
   /* 18. Setup devpts (must be after pivot_root for newinstance) */
   setup_devpts(cfg->hw_access);
 
   /* Apply jail mask after pivot_root for correct path resolution */
-  ds_apply_jail_mask(cfg->hw_access);
+  ds_apply_jail_mask(cfg->hw_access, cfg->privileged_mask);
 
   /* 19. Configure rootfs networking (hostname, resolv.conf, etc) */
   fix_networking_rootfs(cfg);
@@ -493,7 +513,7 @@ int internal_boot(struct ds_config *cfg) {
   /* 23c. Apply security hardening (capabilities)
    * This is done at the very end to ensure all setup tasks that might need
    * privileges (like chown/chmod) are finished. */
-  ds_apply_capability_hardening(cfg->hw_access);
+  ds_apply_capability_hardening(cfg->hw_access, cfg->privileged_mask);
 
   /* 24. Redirect standard I/O to /dev/console */
   int console_fd = open("/dev/console", O_RDWR);

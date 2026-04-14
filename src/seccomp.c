@@ -22,103 +22,106 @@
  * Blocks direct host kernel takeover vectors (module loading, kexec).
  * Applied unconditionally to all kernels and all modes.
  */
-int ds_seccomp_apply_minimal(int hw_access) {
+int ds_seccomp_apply_minimal(int hw_access, int privileged_mask) {
   (void)hw_access;
-  struct sock_filter filter[] = {
-      /* Validate architecture.
-       * KILL on wrong arch - ALLOW was a bypass: on x86-64 a process can
-       * invoke 32-bit syscalls via int 0x80, which the kernel reports as
-       * AUDIT_ARCH_I386, causing the arch check to fail and the old ALLOW
-       * to skip the entire filter. KILL_PROCESS closes that hole. */
-      BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, arch)),
-#if defined(__aarch64__)
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_AARCH64, 1, 0),
-#elif defined(__x86_64__)
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_X86_64, 1, 0),
-#elif defined(__arm__)
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_ARM, 1, 0),
-#elif defined(__i386__)
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_I386, 1, 0),
-#endif
-      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS), /* wrong arch */
+  static struct sock_filter filter[64];
+  int curr = 0;
 
-      /* Load syscall number */
-      BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
+  /* 1. Validate Architecture */
+  filter[curr++] = (struct sock_filter)BPF_STMT(
+      BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, arch));
+#if defined(__aarch64__)
+  filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                AUDIT_ARCH_AARCH64, 1, 0);
+#elif defined(__x86_64__)
+  filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                AUDIT_ARCH_X86_64, 1, 0);
+#elif defined(__arm__)
+  filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                AUDIT_ARCH_ARM, 1, 0);
+#elif defined(__i386__)
+  filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                AUDIT_ARCH_I386, 1, 0);
+#endif
+  filter[curr++] =
+      (struct sock_filter)BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+
+  /* 2. Load syscall number */
+  filter[curr++] = (struct sock_filter)BPF_STMT(
+      BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr));
 
 #if defined(__x86_64__)
-      /* Block x32 ABI syscalls (nr >= 0x40000000).
-       * On x86-64 the x32 ABI uses the same arch value (AUDIT_ARCH_X86_64)
-       * but sets bit 30 in the syscall number. Without this check, a process
-       * can invoke x32 variants of any blocked syscall (e.g. x32 kexec_load)
-       * and bypass the filter entirely since the JEQ checks below only match
-       * the native 64-bit numbers. */
-      BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0x40000000, 0, 1),
-      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+  /* 3. Block x32 ABI */
+  filter[curr++] =
+      (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JGE | BPF_K, 0x40000000, 0, 1);
+  filter[curr++] =
+      (struct sock_filter)BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 #endif
 
-      /* Kernel module loading */
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_init_module, 0, 1),
-      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_finit_module, 0, 1),
-      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_delete_module, 0, 1),
-      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+  if (!(privileged_mask & DS_PRIV_NOSEC)) {
+    /* 4. Kernel module loading */
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  __NR_init_module, 0, 1);
+    filter[curr++] =
+        (struct sock_filter)BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  __NR_finit_module, 0, 1);
+    filter[curr++] =
+        (struct sock_filter)BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  __NR_delete_module, 0, 1);
+    filter[curr++] =
+        (struct sock_filter)BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 
-      /* kexec */
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_kexec_load, 0, 1),
-      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+    /* 5. kexec */
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  __NR_kexec_load, 0, 1);
+    filter[curr++] =
+        (struct sock_filter)BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 #ifdef __NR_kexec_file_load
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_kexec_file_load, 0, 1),
-      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS),
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  __NR_kexec_file_load, 0, 1);
+    filter[curr++] =
+        (struct sock_filter)BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS);
 #endif
 
 #ifdef __NR_clone3
-      /* Block clone3 to force fallback to clone. Seccomp cannot inspect
-       * clone3's struct arguments (since it cannot dereference pointers),
-       * making it a bypass vector for our clone/unshare flag filters. */
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_clone3, 0, 1),
-      BPF_STMT(BPF_RET | BPF_K,
-               SECCOMP_RET_ERRNO | (ENOSYS & SECCOMP_RET_DATA)),
+    /* 6. Block clone3 */
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  __NR_clone3, 0, 1);
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_RET | BPF_K, SECCOMP_RET_ERRNO | (ENOSYS & SECCOMP_RET_DATA));
 #endif
 
-      /* unshare(CLONE_NEWUSER) - a new user namespace grants a full capability
-       * set within it, enabling further kernel exploits.
-       * Block the CLONE_NEWUSER flag only - systemd legitimately calls
-       * unshare(CLONE_NEWNS | CLONE_NEWUTS | ...) and must not be affected.
-       *
-       * This is a kernel attack surface restriction and applies to ALL modes.
-       *
-       * Jump layout (4 instructions skipped by jf so nr stays in acc):
-       *   jf=4 skips: LD args[0], JSET, RET EPERM, LD nr → lands at clone check
-       *   JSET jf=1 skips: RET EPERM → lands at LD nr → falls to clone check */
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_unshare, 0, 4),
-      BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
-               offsetof(struct seccomp_data, args[0])),
-      BPF_JUMP(BPF_JMP | BPF_JSET | BPF_K, 0x10000000 /* CLONE_NEWUSER */, 0,
-               1),
-      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA)),
-      /* Reload syscall nr - reached by both "unshare without CLONE_NEWUSER"
-       * (JSET jf=1) and falls through to the clone check below */
-      BPF_STMT(BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr)),
+    /* 7. unshare(CLONE_NEWUSER) */
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  __NR_unshare, 0, 4);
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[0]));
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JSET | BPF_K,
+                                                  0x10000000, 0, 1);
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_RET | BPF_K, SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA));
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, nr));
 
-      /* clone(CLONE_NEWUSER) - same attack via the clone() syscall path.
-       *
-       * Jump layout (3 instructions skipped by jf):
-       *   jf=3 skips: LD args[0], JSET, RET EPERM → lands at ALLOW
-       *   JSET jf=1 skips: RET EPERM → lands at ALLOW */
-      BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, __NR_clone, 0, 3),
-      BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
-               offsetof(struct seccomp_data, args[0])),
-      BPF_JUMP(BPF_JMP | BPF_JSET | BPF_K, 0x10000000 /* CLONE_NEWUSER */, 0,
-               1),
-      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA)),
+    /* 8. clone(CLONE_NEWUSER) */
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K,
+                                                  __NR_clone, 0, 3);
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_LD | BPF_W | BPF_ABS, offsetof(struct seccomp_data, args[0]));
+    filter[curr++] = (struct sock_filter)BPF_JUMP(BPF_JMP | BPF_JSET | BPF_K,
+                                                  0x10000000, 0, 1);
+    filter[curr++] = (struct sock_filter)BPF_STMT(
+        BPF_RET | BPF_K, SECCOMP_RET_ERRNO | (EPERM & SECCOMP_RET_DATA));
+  }
 
-      /* Allow everything else */
-      BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
-  };
+  /* Allow everything else */
+  filter[curr++] =
+      (struct sock_filter)BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW);
 
   struct sock_fprog prog = {
-      .len = (unsigned short)(sizeof(filter) / sizeof(filter[0])),
+      .len = (unsigned short)curr,
       .filter = filter,
   };
 
