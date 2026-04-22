@@ -183,7 +183,7 @@ You **MUST** apply the correct kABI fix patch for your kernel version. Without t
 > If this patch causes a bootloop, try the alternative patches from the same directory (e.g., `1_2_3` or `3_4_5`).
 
 **For Kernels 6.12 and ABOVE:**
-- Apply the patch from [Documentation/resources/kernel-patches/GKI/kernel-6.12](./resources/kernel-patches/GKI/kernel-6.12/001.GKI-6.12-or-above-fix_sysvipc_kABI.patch).
+- Apply the patch from [Documentation/resources/kernel-patches/GKI/kernel-6.12](./resources/kernel-patches/GKI/kernel-6.12/001.GKI-6.12-or-above-fix_sysvipc_kabi.patch).
 
 **How to apply the patch:**
 
