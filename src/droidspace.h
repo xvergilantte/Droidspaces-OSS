@@ -50,6 +50,13 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifndef RAMFS_MAGIC
+#define RAMFS_MAGIC 0x858458f6
+#endif
+#ifndef TMPFS_MAGIC
+#define TMPFS_MAGIC 0x01021994
+#endif
+
 /* Cgroup Namespace support (Linux 4.6+) */
 #ifndef CLONE_NEWCGROUP
 #define CLONE_NEWCGROUP 0x02000000
@@ -463,6 +470,7 @@ int is_mountpoint(const char *path);
  * ---------------------------------------------------------------------------*/
 
 int ds_cgroup_v2_usable(void);
+int ds_cgroup_kernel_supports_v2(void);
 int ds_cgroup_host_is_v2(void);
 int setup_cgroups(int is_systemd, int force_cgroupv1);
 void ds_cgroup_host_bootstrap(int force_cgroupv1);

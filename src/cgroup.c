@@ -28,33 +28,110 @@ int ds_cgroup_v2_usable(void) {
   return (major > 5 || (major == 5 && minor >= 2));
 }
 
-/* Returns 1 if the HOST's /sys/fs/cgroup is a pure cgroupv2 root.
- * Checked before pivot_root so /sys/fs/cgroup still refers to the host mount.
- * Public so main.c can validate --force-cgroupv1 before launch. */
-int ds_cgroup_host_is_v2(void) {
-  struct statfs sfs;
-  if (statfs("/sys/fs/cgroup", &sfs) != 0)
+/* Scan mountinfo for any host cgroup2 mount (e.g. /dev/cg2_bpf on Android).
+ * Returns 1 and fills 'buf' if found. */
+static int find_host_cgroup2_mount(char *buf, size_t size) {
+  FILE *f = fopen("/proc/self/mountinfo", "re");
+  if (!f)
     return 0;
-  return (unsigned long)sfs.f_type == (unsigned long)CGROUP2_SUPER_MAGIC;
+
+  char line[2048];
+  int found = 0;
+  while (fgets(line, sizeof(line), f)) {
+    char *dash = strstr(line, " - ");
+    if (!dash)
+      continue;
+    char fstype[16];
+    if (sscanf(dash + 3, "%15s", fstype) != 1)
+      continue;
+    if (strcmp(fstype, "cgroup2") != 0)
+      continue;
+
+    /* Extract mountpoint (field 5) */
+    char *p = line;
+    for (int i = 0; i < 4; i++) {
+      p = strchr(p, ' ');
+      if (!p)
+        break;
+      p++;
+    }
+    if (!p)
+      continue;
+    char *mp_end = strchr(p, ' ');
+    if (!mp_end)
+      continue;
+    *mp_end = '\0';
+
+    /* Skip Droidspaces-internal mounts to avoid false positives on restart */
+    if (strstr(p, "/Droidspaces/"))
+      continue;
+
+    if (buf)
+      safe_strncpy(buf, p, size);
+    found = 1;
+    break;
+  }
+  fclose(f);
+  return found;
 }
 
+
+/* Scans mountinfo to find any cgroup2 mount - covers /dev/cg2_bpf (Android)
+ * and /sys/fs/cgroup placed by ds_cgroup_host_bootstrap(). */
+int ds_cgroup_host_is_v2(void) { return find_host_cgroup2_mount(NULL, 0); }
+
+/* Returns 1 if the kernel supports cgroup2 (check /proc/filesystems). */
+int ds_cgroup_kernel_supports_v2(void) {
+  return (grep_file("/proc/filesystems", "cgroup2") > 0);
+}
+
+/* Mount cgroup2 on /sys/fs/cgroup if the host hasn't done so.
+ * Android recovery kernels support cgroup2 but only mount it at /dev/cg2_bpf;
+ * systemd needs it at /sys/fs/cgroup. Sequence: mkdir -> tmpfs anchor ->
+ * cgroup2. */
 void ds_cgroup_host_bootstrap(int force_cgroupv1) {
-  /* ANDROID RECOVERY FIX: If cgroup2 is supported but NOT mounted anywhere
-   * on the host, we mount it ourselves on /sys/fs/cgroup. This prevents
-   * falling back to V1 on modern kernels just because the recovery init
-   * script didn't mount it. */
-  if (!force_cgroupv1 && !ds_cgroup_host_is_v2() &&
-      grep_file("/proc/filesystems", "cgroup2") > 0) {
-    if (mkdir_p("/sys/fs/cgroup", 0755) == 0) {
-      /* Try to mount a tmpfs base first (LXC-style) */
-      mount("none", "/sys/fs/cgroup", "tmpfs", MS_NOSUID | MS_NODEV | MS_NOEXEC,
-            "mode=755,size=16M");
-      if (mount("none", "/sys/fs/cgroup", "cgroup2",
-                MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL) == 0) {
-        ds_log("Auto-mounted Cgroup V2 on host.");
-      }
+  if (force_cgroupv1)
+    return;
+
+  /* Already done */
+  struct statfs sfs;
+  if (statfs("/sys/fs/cgroup", &sfs) == 0 &&
+      (unsigned long)sfs.f_type == (unsigned long)CGROUP2_SUPER_MAGIC)
+    return;
+
+  /* No probe_cgroup2_mount(): mkdtemp fails on ramfs roots (no /tmp).
+   * The mount() calls below self-report failure via errno. */
+  if (grep_file("/proc/filesystems", "cgroup2") <= 0) {
+    ds_log("[CGROUP] cgroup2 not in /proc/filesystems, skipping bootstrap.");
+    return;
+  }
+
+  if (access("/sys/fs/cgroup", F_OK) != 0) {
+    if (mkdir_p("/sys/fs/cgroup", 0755) != 0) {
+      ds_error("[CGROUP] Failed to create /sys/fs/cgroup: %s", strerror(errno));
+      return;
     }
   }
+
+  /* tmpfs anchor needed: cgroup2 can't layer directly on ramfs */
+  if (statfs("/sys/fs/cgroup", &sfs) == 0 &&
+      (unsigned long)sfs.f_type != (unsigned long)TMPFS_MAGIC &&
+      (unsigned long)sfs.f_type != (unsigned long)CGROUP2_SUPER_MAGIC) {
+    if (mount("none", "/sys/fs/cgroup", "tmpfs",
+              MS_NOSUID | MS_NODEV | MS_NOEXEC, "mode=755,size=16M") != 0) {
+      ds_error("[CGROUP] Failed to mount tmpfs on /sys/fs/cgroup: %s",
+               strerror(errno));
+      return;
+    }
+    ds_log("[CGROUP] Mounted tmpfs anchor on /sys/fs/cgroup.");
+  }
+
+  if (mount("none", "/sys/fs/cgroup", "cgroup2",
+            MS_NOSUID | MS_NODEV | MS_NOEXEC, NULL) != 0) {
+    ds_error("Failed to mount cgroup2 on /sys/fs/cgroup: %s", strerror(errno));
+    return;
+  }
+  ds_log("Auto-mounted cgroup2 on /sys/fs/cgroup.");
 }
 
 

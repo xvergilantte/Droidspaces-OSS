@@ -298,10 +298,19 @@ static void enforce_nat_safety(struct ds_config *cfg, int argc, char **argv) {
   }
 }
 
+static int ds_host_supports_v2 = -1;
+
 static void print_cgroup_status(struct ds_config *cfg) {
   if (cfg->force_cgroupv1) {
     ds_warn("Using legacy Cgroup V1 hierarchy (forced by --force-cgroupv1)");
-  } else if (!ds_cgroup_host_is_v2()) {
+    return;
+  }
+
+  /* Host-side V2 support check is cached to avoid repeated /proc scans */
+  if (ds_host_supports_v2 == -1)
+    ds_host_supports_v2 = ds_cgroup_kernel_supports_v2();
+
+  if (!ds_host_supports_v2) {
     ds_warn("Host does not support Cgroup V2 (falling back to legacy V1)");
   }
 }
