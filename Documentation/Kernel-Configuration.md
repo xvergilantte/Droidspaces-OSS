@@ -169,32 +169,30 @@ Google's Generic Kernel Image (GKI) enforces strict **kABI (Kernel Application B
 
 To solve this, Droidspaces provides specialized **kABI-friendly patches** that allow these features to be enabled without shifting offsets.
 
-> [!IMPORTANT]
->
-> **These patches are NOT OPTIONAL.** Without them, the kernel ABI breaks, leading to permanent bootloops during the early init phase.
-
 ### Step 1: Apply the Mandatory kABI Patches
 
-You **MUST** apply the correct kABI fix patches for your kernel version. Skipping these patches will cause an immediate bootloop upon enabling `CONFIG_SYSVIPC`, `CONFIG_IPC_NS` or `CONFIG_POSIX_MQUEUE`.
+> [!IMPORTANT]
+>
+> **These patches are NOT OPTIONAL.** You **MUST** apply the correct kABI fix patches for your kernel version. Skipping these patches will cause an immediate bootloop upon enabling `CONFIG_SYSVIPC`, `CONFIG_IPC_NS` or `CONFIG_POSIX_MQUEUE`.
 
 **For ALL Kernels BELOW 6.12 (5.4, 5.10, 5.15, 6.1, 6.6):**
 
-- Apply the `SYSVIPC` kABI fix from [Documentation/resources/kernel-patches/GKI/below-kernel-6.12](./resources/kernel-patches/GKI/below-kernel-6.12/):
+- Apply the `SYSVIPC` kABI fix from [Documentation/resources/kernel-patches/GKI/below-kernel-6.12/](./resources/kernel-patches/GKI/below-kernel-6.12/):
 
 > [!TIP]
 >
-> The `001.GKI-below-6.12-fix_sysvipc_kABI_6_7_8.patch` is recommended.
+> The [`001.GKI-below-6.12-fix_sysvipc_kABI_6_7_8.patch`](./resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_6_7_8.patch) is recommended.
 >
 > If this patch causes a bootloop, try the alternative patches from the same folder (e.g., `1_2_3` or `3_4_5`).
 
 **For Kernels 5.10 and BELOW ONLY:**
 
 - You **MUST ALSO** apply the `POSIX_MQUEUE` kABI fix:
-  [002.5.10_or_lower_use_android_abi_padding_for_posix_mqueue.patch](./resources/kernel-patches/GKI/below-kernel-6.12/002.5.10_or_lower_use_android_abi_padding_for_posix_mqueue.patch)
+  [Documentation/resources/kernel-patches/GKI/below-kernel-6.12/002.5.10_or_lower_use_android_abi_padding_for_posix_mqueue.patch](./resources/kernel-patches/GKI/below-kernel-6.12/002.5.10_or_lower_use_android_abi_padding_for_posix_mqueue.patch)
 
 **For Kernels 6.12 and ABOVE:**
 
-- Apply the patch from [Documentation/resources/kernel-patches/GKI/kernel-6.12](./resources/kernel-patches/GKI/kernel-6.12/001.GKI-6.12-or-above-fix_sysvipc_kabi.patch).
+- Apply the patch from [Documentation/resources/kernel-patches/GKI/kernel-6.12/001.GKI-6.12-or-above-fix_sysvipc_kabi.patch](./resources/kernel-patches/GKI/kernel-6.12/001.GKI-6.12-or-above-fix_sysvipc_kabi.patch).
 
 **How to apply the patches:**
 
